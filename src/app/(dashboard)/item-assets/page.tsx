@@ -37,6 +37,7 @@ interface ItemAsset {
     notes: string | null;
     item?: { id: number; name: string };
     department?: { id: number; name: string } | null;
+    modified_by?: string | null;
 }
 
 const emptyAsset  = { item_id: '', item_code: '', serial_number: '', purchase_date: '', purchase_price: '', warranty_expiry: '', condition: 'new', department_id: '', notes: '' };
@@ -190,12 +191,13 @@ export default function ItemAssetsPage() {
     const assignableOptions = assignForm.assignable_type === 'employee' ? empOptions : deptOptions;
 
     const columns: Column<ItemAsset>[] = [
-        { key: 'item_code',  label: 'Item Code', className: 'font-mono' },
-        { key: 'item',       label: 'Item',      render: r => r.item?.name ?? '—' },
-        { key: 'department', label: 'Dept.',     render: r => r.department?.name ?? '—' },
-        { key: 'condition',  label: 'Condition', render: r => <Badge status={r.condition} /> },
-        { key: 'status',     label: 'Status',    render: r => <Badge status={r.status} /> },
-        { key: 'purchase_price', label: 'Value', render: r => formatCurrency(r.purchase_price) },
+        { key: 'item_code',      label: 'Item Code',   className: 'font-mono' },
+        { key: 'item',           label: 'Item',        render: r => r.item?.name ?? '—' },
+        { key: 'department',     label: 'Dept.',       render: r => r.department?.name ?? '—' },
+        { key: 'condition',      label: 'Condition',   render: r => <Badge status={r.condition} /> },
+        { key: 'status',         label: 'Status',      render: r => <Badge status={r.status} /> },
+        { key: 'purchase_price', label: 'Value',       render: r => formatCurrency(r.purchase_price) },
+        { key: 'modified_by',    label: 'Modified By', render: r => r.modified_by ?? '—' },
         {
             key: 'actions', label: 'Actions', className: 'w-48 text-right',
             render: row => (

@@ -26,6 +26,7 @@ interface Category {
     parent?: { id: number; name: string } | null;
     children_count?: number;
     items_count?: number;
+    modified_by?: string | null;
 }
 
 const empty = { name: '', code: '', description: '' };
@@ -112,6 +113,8 @@ export default function CategoriesPage() {
     const columns: Column<Category>[] = [
         { key: 'name', label: 'Name' },
         { key: 'code', label: 'Code', render: r => r.code ?? '—', className: 'font-mono' },
+        { key: 'description', label: 'Description', render: r => r.description ?? '—' },
+        { key: 'modified_by', label: 'Modified By', render: r => r.modified_by ?? '—' },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (
@@ -123,7 +126,7 @@ export default function CategoriesPage() {
         },
     ];
 
-    const FormBody = () => (
+    const formFields = (
         <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
                 <Input label="Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
@@ -143,11 +146,11 @@ export default function CategoriesPage() {
 
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Add Category"
                 footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Save</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
             <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Edit Category"
                 footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Update</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
             <ConfirmDialog open={!!deleteRow} onClose={() => setDeleteRow(null)} onConfirm={handleDelete} loading={deleting}
                 message={`Delete category "${deleteRow?.name}"?`} />

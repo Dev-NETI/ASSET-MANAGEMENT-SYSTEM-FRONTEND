@@ -8,6 +8,7 @@ import { useStockIssuances } from '@/hooks/api/useStockIssuances';
 import { useItems } from '@/hooks/api/useItems';
 import { useDepartments } from '@/hooks/api/useDepartments';
 import { useEmployees } from '@/hooks/api/useEmployees';
+import { useAuth } from '@/hooks/auth';
 import PageHeader from '@/components/shared/PageHeader';
 import FilterBar from '@/components/shared/FilterBar';
 import DataTable, { Column } from '@/components/shared/DataTable';
@@ -29,19 +30,26 @@ interface StockIssuance {
     issued_at: string;
     purpose: string | null;
     notes: string | null;
+    issued_to_other: string | null;
     issuable_type?: string;
     item?: { id: number; name: string; unit?: { abbreviation: string } };
     from_department?: { id: number; name: string };
     issuable?: { id: number; name?: string; first_name?: string; last_name?: string; full_name?: string };
+    modified_by?: string | null;
 }
 
-const empty = { item_id: '', from_department_id: '', issuable_type: 'employee', issuable_id: '', quantity: '', issued_at: '', purpose: '', notes: '' };
+const empty = {
+    item_id: '', from_department_id: '', issuable_type: 'employee', issuable_id: '',
+    quantity: '', issued_at: '', purpose: '', notes: '', issued_to_other: '',
+};
 
 export default function StockIssuancesPage() {
-    const api     = useStockIssuances();
-    const itemApi = useItems();
-    const deptApi = useDepartments();
-    const empApi  = useEmployees();
+    const { user }  = useAuth();
+    const isAdmin   = user?.user_type === 'system_administrator';
+    const api       = useStockIssuances();
+    const itemApi   = useItems();
+    const deptApi   = useDepartments();
+    const empApi    = useEmployees();
 
     const { data: res,     isLoading, mutate } = useSWR('/api/stock-issuances', () => api.index());
     const { data: itemRes }                    = useSWR('/api/items-si',        () => itemApi.index());
@@ -69,16 +77,20 @@ export default function StockIssuancesPage() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const payload = {
-                item_id: Number(form.item_id),
-                from_department_id: Number(form.from_department_id),
+            const payload: Record<string, unknown> = {
+                item_id:       Number(form.item_id),
                 issuable_type: form.issuable_type,
-                issuable_id: Number(form.issuable_id),
-                quantity: Number(form.quantity),
-                issued_at: form.issued_at,
-                purpose: form.purpose,
-                notes: form.notes,
+                quantity:      Number(form.quantity),
+                issued_at:     form.issued_at,
+                purpose:       form.purpose,
+                notes:         form.notes,
             };
+            if (isAdmin) payload.from_department_id = Number(form.from_department_id);
+            if (form.issuable_type !== 'others') {
+                payload.issuable_id = Number(form.issuable_id);
+            } else {
+                payload.issued_to_other = form.issued_to_other;
+            }
             await api.store(payload);
             toast.success('Stock issued. Stock decremented.');
             setCreateOpen(false);
@@ -91,9 +103,16 @@ export default function StockIssuancesPage() {
     };
 
     const getIssuableName = (row: StockIssuance) => {
+        if (row.issued_to_other) return row.issued_to_other;
         if (!row.issuable) return '—';
         return row.issuable.full_name ?? row.issuable.name ??
             `${row.issuable.first_name ?? ''} ${row.issuable.last_name ?? ''}`.trim();
+    };
+
+    const getIssuableType = (row: StockIssuance) => {
+        if (row.issued_to_other) return 'Others';
+        if (row.issuable_type?.includes('Employee')) return 'Employee';
+        return 'Department';
     };
 
     const handleSearch = (val: string) => { setSearch(val); setPage(1); };
@@ -103,7 +122,6 @@ export default function StockIssuancesPage() {
         const q = search.toLowerCase();
         return rows.filter(r =>
             r.item?.name?.toLowerCase().includes(q) ||
-            // reference_no not present on issuances, but keep for future compat
             getIssuableName(r).toLowerCase().includes(q)
         );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,13 +136,14 @@ export default function StockIssuancesPage() {
     const issuableOptions = form.issuable_type === 'employee' ? empOptions : deptOptions;
 
     const columns: Column<StockIssuance>[] = [
-        { key: 'item',              label: 'Item',        render: r => r.item?.name ?? '—' },
-        { key: 'from_department',   label: 'From Dept.',  render: r => r.from_department?.name ?? '—' },
-        { key: 'issued_to',         label: 'Issued To',   render: r => getIssuableName(r) },
-        { key: 'type',              label: 'Type',        render: r => r.issuable_type?.includes('Employee') ? 'Employee' : 'Department' },
-        { key: 'quantity',          label: 'Quantity',    render: r => `${formatNumber(r.quantity)} ${r.item?.unit?.abbreviation ?? ''}` },
-        { key: 'issued_at',         label: 'Issued',      render: r => formatDate(r.issued_at, 'MMMM d, yyyy') },
-        { key: 'purpose',           label: 'Purpose',     render: r => r.purpose ?? '—' },
+        { key: 'item',            label: 'Item',        render: r => r.item?.name ?? '—' },
+        ...(isAdmin ? [{ key: 'from_department', label: 'From Dept.', render: (r: StockIssuance) => r.from_department?.name ?? '—' } as Column<StockIssuance>] : []),
+        { key: 'issued_to',       label: 'Issued To',   render: r => getIssuableName(r) },
+        { key: 'type',            label: 'Type',        render: r => getIssuableType(r) },
+        { key: 'quantity',        label: 'Quantity',    render: r => `${formatNumber(r.quantity)} ${r.item?.unit?.abbreviation ?? ''}` },
+        { key: 'purpose',         label: 'Purpose',     render: r => r.purpose ?? '—' },
+        { key: 'modified_by',     label: 'Modified By', render: r => r.modified_by ?? '—' },
+        { key: 'issued_at',       label: 'Date Issued', render: r => formatDate(r.issued_at, 'MMMM d, yyyy') },
     ];
 
     return (
@@ -138,17 +157,44 @@ export default function StockIssuancesPage() {
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Record Stock Issuance" size="lg"
                 footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Save & Decrement Stock</Button></>}>
                 <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    {isAdmin ? (
+                        <div className="grid grid-cols-2 gap-4">
+                            <Select label="Item (Consumable)" value={form.item_id} onChange={e => set('item_id', e.target.value)} options={itemOptions} required error={err('item_id')} />
+                            <Select label="From Department" value={form.from_department_id} onChange={e => set('from_department_id', e.target.value)} options={deptOptions} required error={err('from_department_id')} />
+                        </div>
+                    ) : (
                         <Select label="Item (Consumable)" value={form.item_id} onChange={e => set('item_id', e.target.value)} options={itemOptions} required error={err('item_id')} />
-                        <Select label="From Department" value={form.from_department_id} onChange={e => set('from_department_id', e.target.value)} options={deptOptions} required error={err('from_department_id')} />
-                    </div>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
-                        <Select label="Issue To" value={form.issuable_type}
-                            onChange={e => { set('issuable_type', e.target.value); set('issuable_id', ''); }}
-                            options={[{ value: 'employee', label: 'Employee' }, { value: 'department', label: 'Department' }]} required />
-                        <Select label={form.issuable_type === 'employee' ? 'Employee' : 'Department'}
-                            value={form.issuable_id} onChange={e => set('issuable_id', e.target.value)}
-                            options={issuableOptions} required error={err('issuable_id')} />
+                        <Select
+                            label="Issue To"
+                            value={form.issuable_type}
+                            onChange={e => { set('issuable_type', e.target.value); set('issuable_id', ''); set('issued_to_other', ''); }}
+                            options={[
+                                { value: 'employee',   label: 'Employee' },
+                                { value: 'department', label: 'Department' },
+                                { value: 'others',     label: 'Others' },
+                            ]}
+                            required
+                        />
+                        {form.issuable_type !== 'others' ? (
+                            <Select
+                                label={form.issuable_type === 'employee' ? 'Employee' : 'Department'}
+                                value={form.issuable_id}
+                                onChange={e => set('issuable_id', e.target.value)}
+                                options={issuableOptions}
+                                required
+                                error={err('issuable_id')}
+                            />
+                        ) : (
+                            <Textarea
+                                label="Specify (Issued To)"
+                                value={form.issued_to_other}
+                                onChange={e => set('issued_to_other', e.target.value)}
+                                error={err('issued_to_other')}
+                                required
+                            />
+                        )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <Input label="Quantity" type="number" value={form.quantity} onChange={e => set('quantity', e.target.value)} required error={err('quantity')} />

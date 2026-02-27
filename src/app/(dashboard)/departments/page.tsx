@@ -26,6 +26,7 @@ interface Department {
     employees_count?: number;
     item_assets_count?: number;
     inventory_stocks_count?: number;
+    modified_by?: string | null;
 }
 
 const empty = { name: '', code: '', description: '' };
@@ -111,6 +112,7 @@ export default function DepartmentsPage() {
     const columns: Column<Department>[] = [
         { key: 'code', label: 'Code', className: 'font-mono w-24' },
         { key: 'name', label: 'Name' },
+        { key: 'modified_by', label: 'Modified By', render: r => r.modified_by ?? '—' },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (
@@ -122,7 +124,7 @@ export default function DepartmentsPage() {
         },
     ];
 
-    const FormBody = () => (
+    const formFields = (
         <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
                 <Input label="Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
@@ -145,12 +147,12 @@ export default function DepartmentsPage() {
 
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Add Department"
                 footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Save</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
 
             <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Edit Department"
                 footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Update</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
 
             <ConfirmDialog open={!!deleteRow} onClose={() => setDeleteRow(null)} onConfirm={handleDelete} loading={deleting}

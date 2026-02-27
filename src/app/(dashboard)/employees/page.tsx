@@ -31,6 +31,7 @@ interface Employee {
     phone: string | null;
     status: 'active' | 'inactive';
     department?: { id: number; name: string };
+    modified_by?: string | null;
 }
 
 const empty = { first_name: '', last_name: '', department_id: '', position: '', phone: '', status: 'active' };
@@ -118,10 +119,11 @@ export default function EmployeesPage() {
     const statusOptions = [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }];
 
     const columns: Column<Employee>[] = [
-        { key: 'full_name',  label: 'Name',       render: r => r.full_name ?? `${r.first_name} ${r.last_name}` },
-        { key: 'department', label: 'Department', render: r => r.department?.name ?? '—' },
-        { key: 'position',   label: 'Position',   render: r => r.position ?? '—' },
-        { key: 'status',     label: 'Status',     render: r => <Badge status={r.status} /> },
+        { key: 'full_name',  label: 'Name',        render: r => r.full_name ?? `${r.first_name} ${r.last_name}` },
+        { key: 'department', label: 'Department',  render: r => r.department?.name ?? '—' },
+        { key: 'position',   label: 'Position',    render: r => r.position ?? '—' },
+        { key: 'status',     label: 'Status',      render: r => <Badge status={r.status} /> },
+        { key: 'modified_by', label: 'Modified By', render: r => r.modified_by ?? '—' },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (
@@ -133,7 +135,7 @@ export default function EmployeesPage() {
         },
     ];
 
-    const FormBody = () => (
+    const formFields = (
         <div className="space-y-4">
             <Select label="Department" value={form.department_id} onChange={e => set('department_id', e.target.value)} options={deptOptions} error={err('department_id')} required />
             <div className="grid grid-cols-2 gap-4">
@@ -168,11 +170,11 @@ export default function EmployeesPage() {
 
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Add Employee" size="lg"
                 footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Save</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
             <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Edit Employee" size="lg"
                 footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Update</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
             <ConfirmDialog open={!!deleteRow} onClose={() => setDeleteRow(null)} onConfirm={handleDelete} loading={deleting}
                 message={`Delete employee "${deleteRow?.first_name} ${deleteRow?.last_name}"?`} />

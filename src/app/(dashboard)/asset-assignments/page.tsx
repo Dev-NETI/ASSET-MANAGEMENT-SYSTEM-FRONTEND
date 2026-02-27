@@ -25,6 +25,7 @@ interface AssetAssignment {
     assignable?: { id: number; name?: string; first_name?: string; last_name?: string; full_name?: string };
     assignable_type?: string;
     assigned_by_user?: { name: string };
+    modified_by?: string | null;
 }
 
 export default function AssetAssignmentsPage() {
@@ -76,6 +77,7 @@ export default function AssetAssignmentsPage() {
         { key: 'condition',    label: 'Condition',   render: r => <Badge status={r.condition_on_assign} /> },
         { key: 'status',       label: 'Status',      render: r => <Badge status={r.status} /> },
         { key: 'purpose',      label: 'Purpose',     render: r => r.purpose ?? '—' },
+        { key: 'modified_by',  label: 'Modified By', render: r => r.modified_by ?? '—' },
     ];
 
     return (
