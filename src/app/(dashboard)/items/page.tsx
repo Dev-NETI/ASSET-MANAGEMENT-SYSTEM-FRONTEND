@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/hooks/auth';
 import { useItems } from '@/hooks/api/useItems';
 import { useCategories } from '@/hooks/api/useCategories';
 import { useUnits } from '@/hooks/api/useUnits';
@@ -31,17 +32,24 @@ interface Item {
     item_type: 'fixed_asset' | 'consumable';
     brand: string | null;
     model: string | null;
+    specifications: string[] | null;
     min_stock_level: number | null;
+    department_id: number | null;
     category?: { id: number; name: string };
     unit?: { id: number; name: string; abbreviation: string };
+    department?: { id: number; name: string } | null;
     total_units?: number;
     available_units?: number;
     total_stock?: number;
+    modified_by?: string | null;
 }
 
 const empty = { name: '', description: '', category_id: '', unit_id: '', item_type: 'consumable', brand: '', model: '', min_stock_level: '' };
 
 export default function ItemsPage() {
+    const { user } = useAuth();
+    const isAdmin  = user?.user_type === 'system_administrator';
+
     const api        = useItems();
     const catApi     = useCategories();
     const unitApi    = useUnits();
@@ -133,17 +141,21 @@ export default function ItemsPage() {
     const typeOptions = [{ value: 'fixed_asset', label: 'Fixed Asset' }, { value: 'consumable', label: 'Consumable' }];
 
     const columns: Column<Item>[] = [
-        { key: 'name',      label: 'Name' },
-        { key: 'item_type', label: 'Type',     render: r => <Badge status={r.item_type} /> },
-        { key: 'category',  label: 'Category', render: r => r.category?.name ?? '—' },
-        { key: 'unit',      label: 'Unit',     render: r => r.unit?.abbreviation ?? '—' },
-        { key: 'brand',     label: 'Brand',    render: r => r.brand ?? '—' },
+        { key: 'category',       label: 'Category',      render: r => r.category?.name ?? '—' },
+        { key: 'brand',          label: 'Brand',         render: r => r.brand ?? '—' },
+        { key: 'model',          label: 'Model',         render: r => r.model ?? '—' },
+        { key: 'name',           label: 'Name' },
+        { key: 'specifications', label: 'Specifications', render: r => r.specifications?.length ? r.specifications.join(', ') : '—' },
+        { key: 'item_type',      label: 'Item Type',     render: r => <Badge status={r.item_type} /> },
         {
             key: 'stock', label: 'Stock/Units',
             render: r => r.item_type === 'fixed_asset'
                 ? `${r.available_units ?? 0} / ${r.total_units ?? 0} avail`
                 : formatNumber(r.total_stock ?? 0),
         },
+        { key: 'unit',        label: 'Unit',        render: r => r.unit?.abbreviation ?? '—' },
+        ...(isAdmin ? [{ key: 'department', label: 'Department', render: (r: Item) => r.department?.name ?? '—' } as Column<Item>] : []),
+        { key: 'modified_by', label: 'Modified By', render: r => r.modified_by ?? '—' },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (
@@ -155,7 +167,7 @@ export default function ItemsPage() {
         },
     ];
 
-    const FormBody = () => (
+    const formFields = (
         <div className="space-y-4">
             <Input label="Item Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
             <div className="grid grid-cols-2 gap-4">
@@ -199,11 +211,11 @@ export default function ItemsPage() {
 
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Add Item" size="lg"
                 footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Save</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
             <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Edit Item" size="lg"
                 footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Update</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
             <ConfirmDialog open={!!deleteRow} onClose={() => setDeleteRow(null)} onConfirm={handleDelete} loading={deleting}
                 message={`Delete item "${deleteRow?.name}"?`} />

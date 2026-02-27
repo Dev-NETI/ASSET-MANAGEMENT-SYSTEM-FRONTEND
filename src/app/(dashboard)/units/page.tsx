@@ -21,6 +21,7 @@ interface Unit {
     name: string;
     abbreviation: string;
     items_count?: number;
+    modified_by?: string | null;
 }
 
 const empty = { name: '', abbreviation: '' };
@@ -86,6 +87,7 @@ export default function UnitsPage() {
     const columns: Column<Unit>[] = [
         { key: 'name',         label: 'Name' },
         { key: 'abbreviation', label: 'Abbreviation', className: 'font-mono' },
+        { key: 'modified_by',  label: 'Modified By', render: r => r.modified_by ?? '—' },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (

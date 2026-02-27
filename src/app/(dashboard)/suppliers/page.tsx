@@ -26,6 +26,7 @@ interface Supplier {
     phone: string | null;
     address: string | null;
     stock_receivials_count?: number;
+    modified_by?: string | null;
 }
 
 const empty = { name: '', contact_person: '', email: '', phone: '', address: '' };
@@ -95,10 +96,11 @@ export default function SuppliersPage() {
 
     const columns: Column<Supplier>[] = [
         { key: 'name',           label: 'Name' },
-        { key: 'contact_person', label: 'Contact',  render: r => r.contact_person ?? '—' },
-        { key: 'email',          label: 'Email',    render: r => r.email ?? '—' },
-        { key: 'phone',          label: 'Phone',    render: r => r.phone ?? '—' },
-        { key: 'address',        label: 'Address',  render: r => truncate(r.address ?? '', 40) },
+        { key: 'contact_person', label: 'Contact',     render: r => r.contact_person ?? '—' },
+        { key: 'email',          label: 'Email',       render: r => r.email ?? '—' },
+        { key: 'phone',          label: 'Phone',       render: r => r.phone ?? '—' },
+        { key: 'address',        label: 'Address',     render: r => truncate(r.address ?? '', 40) },
+        { key: 'modified_by',    label: 'Modified By', render: r => r.modified_by ?? '—' },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (
@@ -110,7 +112,7 @@ export default function SuppliersPage() {
         },
     ];
 
-    const FormBody = () => (
+    const formFields = (
         <div className="space-y-4">
             <Input label="Supplier Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
             <div className="grid grid-cols-2 gap-4">
@@ -132,11 +134,11 @@ export default function SuppliersPage() {
 
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Add Supplier"
                 footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Save</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
             <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Edit Supplier"
                 footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Update</Button></>}>
-                <FormBody />
+                {formFields}
             </Modal>
             <ConfirmDialog open={!!deleteRow} onClose={() => setDeleteRow(null)} onConfirm={handleDelete} loading={deleting}
                 message={`Delete supplier "${deleteRow?.name}"?`} />
