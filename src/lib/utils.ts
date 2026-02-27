@@ -61,23 +61,25 @@ export function formatStatus(status: string | null | undefined): string {
 // Return Tailwind badge classes based on status string
 export function getStatusColor(status: string): string {
     const colors: Record<string, string> = {
-        available:    'bg-green-100 text-green-800',
-        assigned:     'bg-blue-100 text-blue-800',
-        under_repair: 'bg-yellow-100 text-yellow-800',
-        disposed:     'bg-gray-100 text-gray-800',
-        active:       'bg-green-100 text-green-800',
-        returned:     'bg-gray-100 text-gray-800',
-        lost:         'bg-red-100 text-red-800',
-        inactive:     'bg-red-100 text-red-800',
-        new:          'bg-emerald-100 text-emerald-800',
-        good:         'bg-blue-100 text-blue-800',
-        fair:         'bg-yellow-100 text-yellow-800',
-        poor:         'bg-orange-100 text-orange-800',
-        damaged:      'bg-red-100 text-red-800',
-        fixed_asset:  'bg-purple-100 text-purple-800',
-        consumable:   'bg-orange-100 text-orange-800',
+        available:    'bg-emerald-50 text-emerald-700 border border-emerald-200',
+        assigned:     'bg-indigo-50 text-indigo-700 border border-indigo-200',
+        under_repair: 'bg-amber-50 text-amber-700 border border-amber-200',
+        disposed:     'bg-slate-100 text-slate-600 border border-slate-200',
+        active:       'bg-emerald-50 text-emerald-700 border border-emerald-200',
+        returned:     'bg-slate-100 text-slate-600 border border-slate-200',
+        lost:         'bg-red-50 text-red-700 border border-red-200',
+        inactive:     'bg-red-50 text-red-700 border border-red-200',
+        new:          'bg-teal-50 text-teal-700 border border-teal-200',
+        good:         'bg-sky-50 text-sky-700 border border-sky-200',
+        fair:         'bg-amber-50 text-amber-700 border border-amber-200',
+        poor:         'bg-orange-50 text-orange-700 border border-orange-200',
+        damaged:      'bg-red-50 text-red-700 border border-red-200',
+        fixed_asset:           'bg-indigo-50 text-indigo-700 border border-indigo-200',
+        consumable:            'bg-violet-50 text-violet-700 border border-violet-200',
+        system_administrator:  'bg-violet-50 text-violet-700 border border-violet-200',
+        employee:              'bg-sky-50 text-sky-700 border border-sky-200',
     };
-    return colors[status] ?? 'bg-gray-100 text-gray-800';
+    return colors[status] ?? 'bg-slate-100 text-slate-600 border border-slate-200';
 }
 
 // Truncate long strings

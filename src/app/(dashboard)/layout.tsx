@@ -13,14 +13,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#fafaf5]">
+            <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
                 <Spinner size="lg" />
             </div>
         );
     }
 
     return (
-        <div className="flex h-screen overflow-hidden bg-[#fafaf5]">
+        <div className="flex h-screen overflow-hidden bg-[#f8fafc]">
             <Sidebar />
             <div className="flex flex-col flex-1 overflow-hidden">
                 <Header />

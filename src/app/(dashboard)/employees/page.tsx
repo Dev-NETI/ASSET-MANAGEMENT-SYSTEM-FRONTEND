@@ -33,7 +33,7 @@ interface Employee {
     department?: { id: number; name: string };
 }
 
-const empty = { employee_id: '', first_name: '', last_name: '', department_id: '', position: '', email: '', phone: '', status: 'active' };
+const empty = { first_name: '', last_name: '', department_id: '', position: '', phone: '', status: 'active' };
 
 export default function EmployeesPage() {
     const api     = useEmployees();
@@ -64,9 +64,9 @@ export default function EmployeesPage() {
     const openCreate = () => { setForm({ ...empty }); setErrors({}); setCreateOpen(true); };
     const openEdit = (row: Employee) => {
         setForm({
-            employee_id: row.employee_id, first_name: row.first_name, last_name: row.last_name,
+            first_name: row.first_name, last_name: row.last_name,
             department_id: String(row.department_id), position: row.position ?? '',
-            email: row.email ?? '', phone: row.phone ?? '', status: row.status,
+            phone: row.phone ?? '', status: row.status,
         });
         setErrors({}); setEditRow(row);
     };
@@ -102,7 +102,6 @@ export default function EmployeesPage() {
             result = result.filter(r =>
                 r.first_name?.toLowerCase().includes(q) ||
                 r.last_name?.toLowerCase().includes(q) ||
-                r.employee_id?.toLowerCase().includes(q) ||
                 r.position?.toLowerCase().includes(q)
             );
         }
@@ -119,12 +118,10 @@ export default function EmployeesPage() {
     const statusOptions = [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }];
 
     const columns: Column<Employee>[] = [
-        { key: 'employee_id', label: 'Employee ID', className: 'font-mono' },
-        { key: 'full_name',   label: 'Name',       render: r => r.full_name ?? `${r.first_name} ${r.last_name}` },
-        { key: 'department',  label: 'Department', render: r => r.department?.name ?? '—' },
-        { key: 'position',    label: 'Position',   render: r => r.position ?? '—' },
-        { key: 'email',       label: 'Email',      render: r => r.email ?? '—' },
-        { key: 'status',      label: 'Status',     render: r => <Badge status={r.status} /> },
+        { key: 'full_name',  label: 'Name',       render: r => r.full_name ?? `${r.first_name} ${r.last_name}` },
+        { key: 'department', label: 'Department', render: r => r.department?.name ?? '—' },
+        { key: 'position',   label: 'Position',   render: r => r.position ?? '—' },
+        { key: 'status',     label: 'Status',     render: r => <Badge status={r.status} /> },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (
@@ -138,10 +135,7 @@ export default function EmployeesPage() {
 
     const FormBody = () => (
         <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-                <Input label="Employee ID" value={form.employee_id} onChange={e => set('employee_id', e.target.value)} error={err('employee_id')} required disabled={!!editRow} />
-                <Select label="Department" value={form.department_id} onChange={e => set('department_id', e.target.value)} options={deptOptions} error={err('department_id')} required />
-            </div>
+            <Select label="Department" value={form.department_id} onChange={e => set('department_id', e.target.value)} options={deptOptions} error={err('department_id')} required />
             <div className="grid grid-cols-2 gap-4">
                 <Input label="First Name" value={form.first_name} onChange={e => set('first_name', e.target.value)} error={err('first_name')} required />
                 <Input label="Last Name" value={form.last_name} onChange={e => set('last_name', e.target.value)} error={err('last_name')} required />
@@ -150,10 +144,7 @@ export default function EmployeesPage() {
                 <Input label="Position" value={form.position} onChange={e => set('position', e.target.value)} error={err('position')} />
                 <Select label="Status" value={form.status} onChange={e => set('status', e.target.value)} options={statusOptions} error={err('status')} required />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <Input label="Email" type="email" value={form.email} onChange={e => set('email', e.target.value)} error={err('email')} />
-                <Input label="Phone" value={form.phone} onChange={e => set('phone', e.target.value)} error={err('phone')} />
-            </div>
+            <Input label="Phone" value={form.phone} onChange={e => set('phone', e.target.value)} error={err('phone')} />
         </div>
     );
 
@@ -161,7 +152,7 @@ export default function EmployeesPage() {
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
             <PageHeader title="Employees" subtitle="Manage staff records per department"
                 action={<Button onClick={openCreate}><Plus className="h-4 w-4" />Add Employee</Button>} />
-            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name, ID, or position…">
+            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name or position…">
                 <select
                     value={statusFilter}
                     onChange={e => { setStatusFilter(e.target.value); setPage(1); }}

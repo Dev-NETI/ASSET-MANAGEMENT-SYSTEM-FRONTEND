@@ -8,6 +8,7 @@ import { useItems } from '@/hooks/api/useItems';
 import { useEmployees } from '@/hooks/api/useEmployees';
 import { useItemAssets } from '@/hooks/api/useItemAssets';
 import { useInventoryStocks } from '@/hooks/api/useInventoryStocks';
+import { useAuth } from '@/hooks/auth';
 import {
     Building2, Package, Users, Monitor, Archive,
     AlertTriangle, ClipboardList
@@ -16,6 +17,9 @@ import { motion } from 'framer-motion';
 import { fadeUp } from '@/lib/motion';
 
 export default function DashboardPage() {
+    const { user } = useAuth();
+    const isAdmin = user?.user_type === 'system_administrator';
+
     const departments  = useDepartments();
     const items        = useItems();
     const employees    = useEmployees();
@@ -57,18 +61,20 @@ export default function DashboardPage() {
                 initial="hidden"
                 animate="visible"
             >
-                <h1 className="text-2xl font-bold text-[#070505]">Dashboard</h1>
-                <p className="text-sm text-gray-500 mt-1">Overview of your inventory system</p>
+                <h1 className="text-2xl font-bold text-[#1e293b] border-l-4 border-[#6366f1] pl-3">Dashboard</h1>
+                <p className="text-sm text-[#64748b] mt-1 pl-3">Overview of your inventory system</p>
             </motion.div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <StatCard
-                    index={0}
-                    label="Departments"
-                    value={deptList.length}
-                    icon={<Building2 className="h-6 w-6" />}
-                    color="bg-[#9bc6ef]"
-                />
+                {isAdmin && (
+                    <StatCard
+                        index={0}
+                        label="Departments"
+                        value={deptList.length}
+                        icon={<Building2 className="h-6 w-6" />}
+                        color="bg-[#9bc6ef]"
+                    />
+                )}
                 <StatCard
                     index={1}
                     label="Total Items"
@@ -76,13 +82,15 @@ export default function DashboardPage() {
                     icon={<Package className="h-6 w-6" />}
                     color="bg-[#cdac6a]"
                 />
-                <StatCard
-                    index={2}
-                    label="Employees"
-                    value={empList.length}
-                    icon={<Users className="h-6 w-6" />}
-                    color="bg-[#9bc6ef]"
-                />
+                {isAdmin && (
+                    <StatCard
+                        index={2}
+                        label="Employees"
+                        value={empList.length}
+                        icon={<Users className="h-6 w-6" />}
+                        color="bg-[#9bc6ef]"
+                    />
+                )}
                 <StatCard
                     index={3}
                     label="Fixed Assets"

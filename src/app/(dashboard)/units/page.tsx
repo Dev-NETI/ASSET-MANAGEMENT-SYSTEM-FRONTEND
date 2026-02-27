@@ -86,7 +86,6 @@ export default function UnitsPage() {
     const columns: Column<Unit>[] = [
         { key: 'name',         label: 'Name' },
         { key: 'abbreviation', label: 'Abbreviation', className: 'font-mono' },
-        { key: 'items_count',  label: 'Items', render: r => r.items_count ?? 0 },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (
