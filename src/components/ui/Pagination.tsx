@@ -30,33 +30,33 @@ export default function Pagination({ page, totalPages, total, perPage, onPageCha
     }
 
     return (
-        <div className="flex items-center justify-between px-1 pt-3 text-sm text-gray-500">
+        <div className="flex items-center justify-between px-1 pt-3 text-sm text-[#64748b]">
             <span>
-                Showing <span className="font-medium text-[#070505]">{from}–{to}</span> of{' '}
-                <span className="font-medium text-[#070505]">{total}</span> records
+                Showing <span className="font-medium text-[#1e293b]">{from}–{to}</span> of{' '}
+                <span className="font-medium text-[#1e293b]">{total}</span> records
             </span>
 
             <div className="flex items-center gap-1">
                 <button
                     onClick={() => onPageChange(page - 1)}
                     disabled={page === 1}
-                    className="p-1.5 rounded-lg hover:bg-[#9bc6ef]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 rounded-lg border border-[#e2e8f0] bg-white text-[#64748b] hover:border-[#6366f1] hover:text-[#6366f1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                     <ChevronLeft className="h-4 w-4" />
                 </button>
 
                 {pages.map((p, i) =>
                     p === '...' ? (
-                        <span key={`ellipsis-${i}`} className="px-2 py-1 text-gray-400">…</span>
+                        <span key={`ellipsis-${i}`} className="px-2 py-1 text-[#94a3b8]">…</span>
                     ) : (
                         <button
                             key={p}
                             onClick={() => onPageChange(p as number)}
                             className={cn(
-                                'min-w-[2rem] h-8 px-2 rounded-lg text-sm font-medium transition-colors',
+                                'min-w-[2rem] h-8 px-2 rounded-lg text-sm font-medium transition-colors border',
                                 p === page
-                                    ? 'bg-[#cdac6a] text-[#070505] shadow-sm'
-                                    : 'hover:bg-[#9bc6ef]/20 text-gray-600'
+                                    ? 'bg-[#6366f1] text-white border-[#6366f1] shadow-sm shadow-indigo-500/25'
+                                    : 'bg-white border-[#e2e8f0] text-[#64748b] hover:border-[#6366f1] hover:text-[#6366f1]'
                             )}
                         >
                             {p}
@@ -67,7 +67,7 @@ export default function Pagination({ page, totalPages, total, perPage, onPageCha
                 <button
                     onClick={() => onPageChange(page + 1)}
                     disabled={page === totalPages}
-                    className="p-1.5 rounded-lg hover:bg-[#9bc6ef]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 rounded-lg border border-[#e2e8f0] bg-white text-[#64748b] hover:border-[#6366f1] hover:text-[#6366f1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                     <ChevronRight className="h-4 w-4" />
                 </button>

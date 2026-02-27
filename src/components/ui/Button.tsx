@@ -13,11 +13,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-    primary:   'bg-[#9bc6ef] text-[#070505] hover:bg-[#78aede] focus:ring-[#9bc6ef]',
-    secondary: 'bg-white text-[#070505] border border-gray-300 hover:bg-gray-50 focus:ring-gray-400',
-    danger:    'bg-red-500 text-white hover:bg-red-600 focus:ring-red-400',
-    ghost:     'text-[#070505] hover:bg-[#9bc6ef]/20 focus:ring-[#9bc6ef]',
-    gold:      'bg-[#cdac6a] text-[#070505] hover:bg-[#b89452] focus:ring-[#cdac6a]',
+    primary:   'bg-[#6366f1] text-white hover:bg-[#4f46e5] focus:ring-[#6366f1] shadow-sm shadow-indigo-500/25',
+    secondary: 'bg-white text-[#1e293b] border border-[#e2e8f0] hover:bg-[#f8fafc] focus:ring-[#6366f1]',
+    danger:    'bg-[#ef4444] text-white hover:bg-red-600 focus:ring-red-400',
+    ghost:     'text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#1e293b] focus:ring-[#6366f1]',
+    gold:      'bg-[#f59e0b] text-white hover:bg-amber-500 focus:ring-amber-400 shadow-sm shadow-amber-400/25',
 };
 
 const sizes = {

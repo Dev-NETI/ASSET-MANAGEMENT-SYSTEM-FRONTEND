@@ -28,7 +28,7 @@ interface Department {
     inventory_stocks_count?: number;
 }
 
-const empty = { name: '', code: '', description: '', head_name: '' };
+const empty = { name: '', code: '', description: '' };
 
 export default function DepartmentsPage() {
     const api = useDepartments();
@@ -52,7 +52,7 @@ export default function DepartmentsPage() {
 
     const openCreate = () => { setForm({ ...empty }); setErrors({}); setCreateOpen(true); };
     const openEdit = (row: Department) => {
-        setForm({ name: row.name, code: row.code, description: row.description ?? '', head_name: row.head_name ?? '' });
+        setForm({ name: row.name, code: row.code, description: row.description ?? '' });
         setErrors({});
         setEditRow(row);
     };
@@ -101,8 +101,7 @@ export default function DepartmentsPage() {
         const q = search.toLowerCase();
         return rows.filter(r =>
             r.name?.toLowerCase().includes(q) ||
-            r.code?.toLowerCase().includes(q) ||
-            r.head_name?.toLowerCase().includes(q)
+            r.code?.toLowerCase().includes(q)
         );
     }, [rows, search]);
 
@@ -110,11 +109,8 @@ export default function DepartmentsPage() {
     const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
     const columns: Column<Department>[] = [
-        { key: 'code',       label: 'Code',        className: 'font-mono w-24' },
-        { key: 'name',       label: 'Name' },
-        { key: 'head_name',  label: 'Head',        render: r => r.head_name ?? '—' },
-        { key: 'employees_count', label: 'Employees', render: r => r.employees_count ?? 0 },
-        { key: 'item_assets_count', label: 'Assets',  render: r => r.item_assets_count ?? 0 },
+        { key: 'code', label: 'Code', className: 'font-mono w-24' },
+        { key: 'name', label: 'Name' },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (
@@ -132,7 +128,6 @@ export default function DepartmentsPage() {
                 <Input label="Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
                 <Input label="Code" value={form.code} onChange={e => set('code', e.target.value)} error={err('code')} required placeholder="e.g. NOD" />
             </div>
-            <Input label="Department Head" value={form.head_name} onChange={e => set('head_name', e.target.value)} error={err('head_name')} />
             <Textarea label="Description" value={form.description} onChange={e => set('description', e.target.value)} error={err('description')} />
         </div>
     );
@@ -144,7 +139,7 @@ export default function DepartmentsPage() {
                 subtitle="Manage organizational departments"
                 action={<Button onClick={openCreate}><Plus className="h-4 w-4" />Add Department</Button>}
             />
-            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name, code, or head…" />
+            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name or code…" />
             <DataTable columns={columns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
             <Pagination page={page} totalPages={totalPages} total={filtered.length} perPage={PER_PAGE} onPageChange={setPage} />
 

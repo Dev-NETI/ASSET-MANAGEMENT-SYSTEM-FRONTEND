@@ -13,7 +13,6 @@ import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { fadeUp } from '@/lib/motion';
@@ -29,7 +28,7 @@ interface Category {
     items_count?: number;
 }
 
-const empty = { name: '', code: '', description: '', parent_id: '' };
+const empty = { name: '', code: '', description: '' };
 
 export default function CategoriesPage() {
     const api = useCategories();
@@ -44,9 +43,8 @@ export default function CategoriesPage() {
     const [saving, setSaving]         = useState(false);
     const [deleting, setDeleting]     = useState(false);
 
-    const [search, setSearch]       = useState('');
-    const [levelFilter, setLevelFilter] = useState('');
-    const [page, setPage]           = useState(1);
+    const [search, setSearch] = useState('');
+    const [page, setPage]     = useState(1);
     const PER_PAGE = 10;
 
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -54,7 +52,7 @@ export default function CategoriesPage() {
 
     const openCreate = () => { setForm({ ...empty }); setErrors({}); setCreateOpen(true); };
     const openEdit = (row: Category) => {
-        setForm({ name: row.name, code: row.code ?? '', description: row.description ?? '', parent_id: row.parent_id ? String(row.parent_id) : '' });
+        setForm({ name: row.name, code: row.code ?? '', description: row.description ?? '' });
         setErrors({});
         setEditRow(row);
     };
@@ -62,7 +60,7 @@ export default function CategoriesPage() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const payload = { ...form, parent_id: form.parent_id || null };
+            const payload = { ...form };
             if (editRow) {
                 await api.update(editRow.id, payload);
                 toast.success('Category updated.');
@@ -100,36 +98,20 @@ export default function CategoriesPage() {
     const handleSearch = (val: string) => { setSearch(val); setPage(1); };
 
     const filtered = useMemo(() => {
-        let result = rows;
-        if (search.trim()) {
-            const q = search.toLowerCase();
-            result = result.filter(r =>
-                r.name?.toLowerCase().includes(q) ||
-                r.code?.toLowerCase().includes(q)
-            );
-        }
-        if (levelFilter === 'top') {
-            result = result.filter(r => r.parent_id === null);
-        } else if (levelFilter === 'sub') {
-            result = result.filter(r => r.parent_id !== null);
-        }
-        return result;
-    }, [rows, search, levelFilter]);
+        if (!search.trim()) return rows;
+        const q = search.toLowerCase();
+        return rows.filter(r =>
+            r.name?.toLowerCase().includes(q) ||
+            r.code?.toLowerCase().includes(q)
+        );
+    }, [rows, search]);
 
     const totalPages = Math.ceil(filtered.length / PER_PAGE);
     const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-    // Only top-level categories as parent options
-    const parentOptions = rows
-        .filter(r => !r.parent_id)
-        .map(r => ({ value: r.id, label: r.name }));
-
     const columns: Column<Category>[] = [
-        { key: 'name',   label: 'Name' },
-        { key: 'code',   label: 'Code', render: r => r.code ?? '—', className: 'font-mono' },
-        { key: 'parent', label: 'Parent', render: r => r.parent?.name ?? '—' },
-        { key: 'children_count', label: 'Sub-cats', render: r => r.children_count ?? 0 },
-        { key: 'items_count',    label: 'Items',    render: r => r.items_count ?? 0 },
+        { key: 'name', label: 'Name' },
+        { key: 'code', label: 'Code', render: r => r.code ?? '—', className: 'font-mono' },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (
@@ -143,11 +125,9 @@ export default function CategoriesPage() {
 
     const FormBody = () => (
         <div className="space-y-4">
-            <Input label="Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
             <div className="grid grid-cols-2 gap-4">
+                <Input label="Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
                 <Input label="Code" value={form.code} onChange={e => set('code', e.target.value)} error={err('code')} />
-                <Select label="Parent Category" value={form.parent_id} onChange={e => set('parent_id', e.target.value)}
-                    options={parentOptions} placeholder="None (top-level)" error={err('parent_id')} />
             </div>
             <Textarea label="Description" value={form.description} onChange={e => set('description', e.target.value)} error={err('description')} />
         </div>
@@ -155,19 +135,9 @@ export default function CategoriesPage() {
 
     return (
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
-            <PageHeader title="Categories" subtitle="Hierarchical item categories"
+            <PageHeader title="Categories" subtitle="Manage item categories"
                 action={<Button onClick={openCreate}><Plus className="h-4 w-4" />Add Category</Button>} />
-            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name or code…">
-                <select
-                    value={levelFilter}
-                    onChange={e => { setLevelFilter(e.target.value); setPage(1); }}
-                    className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white text-[#070505] focus:outline-none focus:ring-2 focus:ring-[#9bc6ef]"
-                >
-                    <option value="">All Levels</option>
-                    <option value="top">Top-level Only</option>
-                    <option value="sub">Sub-categories Only</option>
-                </select>
-            </FilterBar>
+            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name or code…" />
             <DataTable columns={columns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
             <Pagination page={page} totalPages={totalPages} total={filtered.length} perPage={PER_PAGE} onPageChange={setPage} />
 

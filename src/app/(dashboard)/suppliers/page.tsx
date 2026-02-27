@@ -99,7 +99,6 @@ export default function SuppliersPage() {
         { key: 'email',          label: 'Email',    render: r => r.email ?? '—' },
         { key: 'phone',          label: 'Phone',    render: r => r.phone ?? '—' },
         { key: 'address',        label: 'Address',  render: r => truncate(r.address ?? '', 40) },
-        { key: 'stock_receivials_count', label: 'Receivals', render: r => r.stock_receivials_count ?? 0 },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
             render: row => (

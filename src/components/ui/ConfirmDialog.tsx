@@ -33,10 +33,10 @@ export default function ConfirmDialog({
             }
         >
             <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 rounded-full bg-red-100 p-2">
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                <div className="flex-shrink-0 rounded-xl bg-red-50 border border-red-100 p-2.5">
+                    <AlertTriangle className="h-5 w-5 text-red-500" />
                 </div>
-                <p className="text-sm text-gray-600 mt-1">{message}</p>
+                <p className="text-sm text-[#64748b] mt-1">{message}</p>
             </div>
         </Modal>
     );
