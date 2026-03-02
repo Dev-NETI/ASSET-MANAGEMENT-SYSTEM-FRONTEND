@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
@@ -16,7 +16,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Badge from '@/components/ui/Badge';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
 import { fadeUp } from '@/lib/motion';
 
 interface Employee {
@@ -54,10 +54,22 @@ export default function EmployeesPage() {
     const [saving, setSaving]         = useState(false);
     const [deleting, setDeleting]     = useState(false);
 
-    const [search, setSearch]           = useState('');
+    const [search, setSearch]             = useState('');
     const [statusFilter, setStatusFilter] = useState('');
-    const [page, setPage]               = useState(1);
+    const [page, setPage]                 = useState(1);
     const PER_PAGE = 10;
+
+    const [colsOpen, setColsOpen] = useState(false);
+    const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['full_name', 'department', 'position', 'status']));
+    const colsRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
     const err = (k: string) => errors[k]?.[0];
@@ -118,11 +130,19 @@ export default function EmployeesPage() {
     const deptOptions   = departments.map(d => ({ value: d.id, label: d.name }));
     const statusOptions = [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }];
 
+    const toggleableCols = [
+        { key: 'full_name',   label: 'Name' },
+        { key: 'department',  label: 'Department' },
+        { key: 'position',    label: 'Position' },
+        { key: 'status',      label: 'Status' },
+        { key: 'modified_by', label: 'Modified By' },
+    ];
+
     const columns: Column<Employee>[] = [
-        { key: 'full_name',  label: 'Name',        render: r => r.full_name ?? `${r.first_name} ${r.last_name}` },
-        { key: 'department', label: 'Department',  render: r => r.department?.name ?? '—' },
-        { key: 'position',   label: 'Position',    render: r => r.position ?? '—' },
-        { key: 'status',     label: 'Status',      render: r => <Badge status={r.status} /> },
+        { key: 'full_name',   label: 'Name',        render: r => r.full_name ?? `${r.first_name} ${r.last_name}` },
+        { key: 'department',  label: 'Department',  render: r => r.department?.name ?? '—' },
+        { key: 'position',    label: 'Position',    render: r => r.position ?? '—' },
+        { key: 'status',      label: 'Status',      render: r => <Badge status={r.status} /> },
         { key: 'modified_by', label: 'Modified By', render: r => r.modified_by ?? '—' },
         {
             key: 'actions', label: 'Actions', className: 'w-24 text-right',
@@ -134,6 +154,8 @@ export default function EmployeesPage() {
             ),
         },
     ];
+
+    const visibleColumns = columns.filter(c => c.key === 'actions' || visibleCols.has(c.key));
 
     const formFields = (
         <div className="space-y-4">
@@ -164,8 +186,27 @@ export default function EmployeesPage() {
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                 </select>
+                <div className="relative" ref={colsRef}>
+                    <Button variant="secondary" onClick={() => setColsOpen(o => !o)}>
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Columns
+                    </Button>
+                    {colsOpen && (
+                        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-48">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Show Columns</p>
+                            {toggleableCols.map(c => (
+                                <label key={c.key} className="flex items-center gap-2 py-1 cursor-pointer text-sm text-gray-700 hover:text-gray-900">
+                                    <input type="checkbox" checked={visibleCols.has(c.key)}
+                                        onChange={e => setVisibleCols(prev => { const n = new Set(prev); e.target.checked ? n.add(c.key) : n.delete(c.key); return n; })}
+                                        className="rounded border-gray-300" />
+                                    {c.label}
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </FilterBar>
-            <DataTable columns={columns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
+            <DataTable columns={visibleColumns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
             <Pagination page={page} totalPages={totalPages} total={filtered.length} perPage={PER_PAGE} onPageChange={setPage} />
 
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Add Employee" size="lg"

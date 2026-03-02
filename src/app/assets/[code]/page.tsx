@@ -3,10 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-interface Specification {
-  [key: string]: string | number;
-}
-
 interface AssetDetail {
   id: number;
   item_code: string;
@@ -17,11 +13,13 @@ interface AssetDetail {
   condition: string;
   status: string;
   notes: string | null;
+  delivery_receipt_no: string | null;
   item: {
     name: string;
     brand: string | null;
     model: string | null;
-    specifications: Specification | null;
+    specifications: Record<string, string> | string[] | null;
+    category: { name: string } | null;
   } | null;
   department: { name: string } | null;
   active_assignment: {
@@ -34,54 +32,34 @@ interface AssetDetail {
   } | null;
 }
 
-const STATUS_STYLES: Record<
-  string,
-  { bg: string; text: string; label: string }
-> = {
-  available: {
-    bg: "bg-emerald-100",
-    text: "text-emerald-700",
-    label: "Available",
-  },
-  assigned: { bg: "bg-blue-100", text: "text-blue-700", label: "Assigned" },
-  under_repair: {
-    bg: "bg-amber-100",
-    text: "text-amber-700",
-    label: "Under Repair",
-  },
-  disposed: { bg: "bg-red-100", text: "text-red-700", label: "Disposed" },
+const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  available:   { bg: "bg-emerald-100", text: "text-emerald-700", label: "Available" },
+  assigned:    { bg: "bg-blue-100",    text: "text-blue-700",    label: "Assigned" },
+  under_repair:{ bg: "bg-amber-100",   text: "text-amber-700",   label: "Under Repair" },
+  disposed:    { bg: "bg-red-100",     text: "text-red-700",     label: "Disposed" },
 };
 
-const CONDITION_STYLES: Record<
-  string,
-  { bg: string; text: string; label: string }
-> = {
-  new: { bg: "bg-sky-100", text: "text-sky-700", label: "New" },
-  good: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Good" },
-  fair: { bg: "bg-yellow-100", text: "text-yellow-700", label: "Fair" },
-  poor: { bg: "bg-orange-100", text: "text-orange-700", label: "Poor" },
-  damaged: { bg: "bg-red-100", text: "text-red-700", label: "Damaged" },
-  lost: { bg: "bg-gray-100", text: "text-gray-700", label: "Lost" },
-  disposed: { bg: "bg-red-100", text: "text-red-700", label: "Disposed" },
+const CONDITION_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  new:     { bg: "bg-sky-100",     text: "text-sky-700",     label: "New" },
+  good:    { bg: "bg-emerald-100", text: "text-emerald-700", label: "Good" },
+  fair:    { bg: "bg-yellow-100",  text: "text-yellow-700",  label: "Fair" },
+  poor:    { bg: "bg-orange-100",  text: "text-orange-700",  label: "Poor" },
+  damaged: { bg: "bg-red-100",     text: "text-red-700",     label: "Damaged" },
+  lost:    { bg: "bg-gray-100",    text: "text-gray-700",    label: "Lost" },
+  disposed:{ bg: "bg-red-100",     text: "text-red-700",     label: "Disposed" },
 };
 
-function Badge({ value, map }: { value: string; map: typeof STATUS_STYLES }) {
-  const style = map[value] ?? {
-    bg: "bg-gray-100",
-    text: "text-gray-600",
-    label: value,
-  };
+function StatusBadge({ value, map }: { value: string; map: typeof STATUS_STYLES }) {
+  const style = map[value] ?? { bg: "bg-gray-100", text: "text-gray-600", label: value };
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}
-    >
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}>
       {style.label}
     </span>
   );
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  if (!value && value !== 0) return null;
+  if (value === null || value === undefined || value === "") return null;
   return (
     <div className="flex flex-col sm:flex-row sm:items-start py-3 border-b border-gray-100 last:border-0">
       <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wide w-36 shrink-0 mb-0.5 sm:mb-0 pt-0.5">
@@ -101,6 +79,11 @@ function formatDate(dateStr: string | null) {
   });
 }
 
+function formatCurrency(value: string | number | null) {
+  if (value === null || value === undefined || value === "") return null;
+  return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(Number(value));
+}
+
 export default function AssetDetailPage() {
   const { code } = useParams<{ code: string }>();
   const [asset, setAsset] = useState<AssetDetail | null>(null);
@@ -114,10 +97,7 @@ export default function AssetDetailPage() {
       headers: { Accept: "application/json" },
     })
       .then(async (res) => {
-        if (res.status === 404) {
-          setNotFound(true);
-          return;
-        }
+        if (res.status === 404) { setNotFound(true); return; }
         const json = await res.json();
         setAsset(json?.data ?? null);
       })
@@ -141,9 +121,7 @@ export default function AssetDetailPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="text-center">
           <div className="text-5xl mb-4">🔍</div>
-          <h1 className="text-xl font-bold text-gray-800 mb-1">
-            Asset Not Found
-          </h1>
+          <h1 className="text-xl font-bold text-gray-800 mb-1">Asset Not Found</h1>
           <p className="text-sm text-gray-500">
             No asset with code <strong>{code}</strong> exists.
           </p>
@@ -158,24 +136,19 @@ export default function AssetDetailPage() {
     null;
 
   const specs = asset.item?.specifications;
-  const specText =
-    specs && typeof specs === "object"
-      ? Object.entries(specs)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join("\n")
-      : null;
+  const specsEntries: [string, string][] = specs
+    ? Array.isArray(specs)
+      ? specs.map((s, i) => [String(i + 1), s])
+      : Object.entries(specs)
+    : [];
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header bar */}
       <div className="bg-[#1a1f36] text-white px-4 py-4 flex items-center gap-3">
         <div className="flex flex-col">
-          <span className="text-xs text-[#8b92b8] uppercase tracking-widest">
-            Inventory System
-          </span>
-          <span className="text-base font-semibold text-white leading-tight">
-            Fixed Asset Detail
-          </span>
+          <span className="text-xs text-[#8b92b8] uppercase tracking-widest">Inventory System</span>
+          <span className="text-base font-semibold text-white leading-tight">Fixed Asset Detail</span>
         </div>
       </div>
 
@@ -184,72 +157,65 @@ export default function AssetDetailPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
-                Item Code
-              </p>
-              <p className="font-mono text-2xl font-bold text-[#1a1f36] tracking-wide">
-                {asset.item_code}
-              </p>
-              <p className="text-base text-gray-700 mt-1 font-medium">
-                {asset.item?.name}
-              </p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Item Code</p>
+              <p className="font-mono text-2xl font-bold text-[#1a1f36] tracking-wide">{asset.item_code}</p>
+              <p className="text-base text-gray-700 mt-1 font-medium">{asset.item?.name}</p>
             </div>
             <div className="flex flex-col items-end gap-1.5 shrink-0">
-              <Badge value={asset.status} map={STATUS_STYLES} />
-              <Badge value={asset.condition} map={CONDITION_STYLES} />
+              <StatusBadge value={asset.status}    map={STATUS_STYLES} />
+              <StatusBadge value={asset.condition} map={CONDITION_STYLES} />
             </div>
           </div>
         </div>
 
-        {/* Asset details */}
+        {/* Item Information */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 pt-1 pb-2">
-          <p className="text-xs font-semibold text-[#6366f1] uppercase tracking-wide pt-4 pb-2">
-            Item Information
-          </p>
+          <p className="text-xs font-semibold text-[#6366f1] uppercase tracking-wide pt-4 pb-2">Item Information</p>
           <dl>
-            <Row label="Brand" value={asset.item?.brand} />
-            <Row label="Model" value={asset.item?.model} />
-            <Row
-              label="Specification"
-              value={
-                specText ? (
-                  <span className="whitespace-pre-line">{specText}</span>
-                ) : null
-              }
-            />
+            <Row label="Category" value={asset.item?.category?.name} />
+            <Row label="Brand"    value={asset.item?.brand} />
+            <Row label="Model"    value={asset.item?.model} />
           </dl>
+          {specsEntries.length > 0 && (
+            <div className="py-3 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Specifications</p>
+              <ul className="space-y-1">
+                {specsEntries.map(([k, v]) => (
+                  <li key={k} className="text-sm text-gray-800">
+                    {!isNaN(Number(k)) ? (
+                      <span>• {v}</span>
+                    ) : (
+                      <span><span className="text-gray-500">{k}:</span> {v}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
-        {/* Asset properties */}
+        {/* Asset Details */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 pt-1 pb-2">
-          <p className="text-xs font-semibold text-[#6366f1] uppercase tracking-wide pt-4 pb-2">
-            Asset Properties
-          </p>
+          <p className="text-xs font-semibold text-[#6366f1] uppercase tracking-wide pt-4 pb-2">Asset Details</p>
           <dl>
-            <Row label="Department" value={asset.department?.name} />
-            <Row label="Serial No." value={asset.serial_number} />
-            <Row
-              label="Purchase Date"
-              value={formatDate(asset.purchase_date)}
-            />
-            <Row label="Warranty" value={formatDate(asset.warranty_expiry)} />
-            <Row label="Notes" value={asset.notes} />
+            <Row label="Department"    value={asset.department?.name} />
+            <Row label="Serial No."    value={asset.serial_number} />
+            <Row label="Value"         value={formatCurrency(asset.purchase_price)} />
+            <Row label="Purchase Date" value={formatDate(asset.purchase_date)} />
+            <Row label="Warranty Exp." value={formatDate(asset.warranty_expiry)} />
+            <Row label="DR No."        value={asset.delivery_receipt_no} />
+            <Row label="Notes"         value={asset.notes} />
           </dl>
         </div>
 
         {/* Assignment */}
         {asset.active_assignment && (
           <div className="bg-blue-50 rounded-2xl border border-blue-100 px-5 pt-1 pb-2">
-            <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide pt-4 pb-2">
-              Currently Assigned
-            </p>
+            <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide pt-4 pb-2">Currently Assigned</p>
             <dl>
               <Row label="Assigned To" value={assigneeName} />
-              <Row
-                label="Assigned On"
-                value={formatDate(asset.active_assignment.assigned_at)}
-              />
-              <Row label="Purpose" value={asset.active_assignment.purpose} />
+              <Row label="Assigned On" value={formatDate(asset.active_assignment.assigned_at)} />
+              <Row label="Purpose"     value={asset.active_assignment.purpose} />
             </dl>
           </div>
         )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
@@ -14,7 +14,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
 import { truncate } from '@/lib/utils';
 import { fadeUp } from '@/lib/motion';
 
@@ -47,6 +47,18 @@ export default function SuppliersPage() {
     const [search, setSearch] = useState('');
     const [page, setPage]     = useState(1);
     const PER_PAGE = 10;
+
+    const [colsOpen, setColsOpen] = useState(false);
+    const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['name', 'contact_person', 'email', 'phone']));
+    const colsRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
     const err = (k: string) => errors[k]?.[0];
@@ -94,6 +106,15 @@ export default function SuppliersPage() {
     const totalPages = Math.ceil(filtered.length / PER_PAGE);
     const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
+    const toggleableCols = [
+        { key: 'name',           label: 'Name' },
+        { key: 'contact_person', label: 'Contact' },
+        { key: 'email',          label: 'Email' },
+        { key: 'phone',          label: 'Phone' },
+        { key: 'address',        label: 'Address' },
+        { key: 'modified_by',    label: 'Modified By' },
+    ];
+
     const columns: Column<Supplier>[] = [
         { key: 'name',           label: 'Name' },
         { key: 'contact_person', label: 'Contact',     render: r => r.contact_person ?? '—' },
@@ -112,6 +133,8 @@ export default function SuppliersPage() {
         },
     ];
 
+    const visibleColumns = columns.filter(c => c.key === 'actions' || visibleCols.has(c.key));
+
     const formFields = (
         <div className="space-y-4">
             <Input label="Supplier Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
@@ -128,8 +151,28 @@ export default function SuppliersPage() {
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
             <PageHeader title="Suppliers" subtitle="Manage vendor/supplier records"
                 action={<Button onClick={openCreate}><Plus className="h-4 w-4" />Add Supplier</Button>} />
-            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name, contact, email, or phone…" />
-            <DataTable columns={columns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
+            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name, contact, email, or phone…">
+                <div className="relative" ref={colsRef}>
+                    <Button variant="secondary" onClick={() => setColsOpen(o => !o)}>
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Columns
+                    </Button>
+                    {colsOpen && (
+                        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-48">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Show Columns</p>
+                            {toggleableCols.map(c => (
+                                <label key={c.key} className="flex items-center gap-2 py-1 cursor-pointer text-sm text-gray-700 hover:text-gray-900">
+                                    <input type="checkbox" checked={visibleCols.has(c.key)}
+                                        onChange={e => setVisibleCols(prev => { const n = new Set(prev); e.target.checked ? n.add(c.key) : n.delete(c.key); return n; })}
+                                        className="rounded border-gray-300" />
+                                    {c.label}
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </FilterBar>
+            <DataTable columns={visibleColumns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
             <Pagination page={page} totalPages={totalPages} total={filtered.length} perPage={PER_PAGE} onPageChange={setPage} />
 
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Add Supplier"

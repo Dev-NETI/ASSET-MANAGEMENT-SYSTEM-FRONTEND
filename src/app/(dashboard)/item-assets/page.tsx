@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import { jsPDF } from "jspdf";
 import useSWR from "swr";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
@@ -20,7 +21,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import Badge from "@/components/ui/Badge";
-import { Plus, Pencil, Trash2, UserCheck, Undo2, QrCode } from "lucide-react";
+import { Plus, Pencil, Trash2, UserCheck, Undo2, QrCode, Eye, SlidersHorizontal, Download } from "lucide-react";
 import { formatDate, formatCurrency, getCurrentDate } from "@/lib/utils";
 import { fadeUp } from "@/lib/motion";
 
@@ -38,7 +39,14 @@ interface ItemAsset {
   notes: string | null;
   delivery_receipt_no: string | null;
   delivery_receipt_file: string | null;
-  item?: { id: number; name: string };
+  item?: {
+    id: number;
+    name: string;
+    brand?: string | null;
+    model?: string | null;
+    specifications?: string[] | Record<string, string> | null;
+    category?: { id: number; name: string } | null;
+  };
   department?: { id: number; name: string } | null;
   modified_by?: string | null;
   created_at?: string | null;
@@ -59,6 +67,7 @@ const emptyAsset = {
 const emptyAssign = {
   assignable_type: "employee",
   assignable_id: "",
+  assignable_label: "",
   assigned_at: "",
   expected_return_date: "",
   condition_on_assign: "good",
@@ -170,17 +179,35 @@ export default function ItemAssetsPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [viewRow, setViewRow] = useState<ItemAsset | null>(null);
   const [drFile, setDrFile] = useState<File | null>(null);
   const [drView, setDrView] = useState<{ url: string; label: string } | null>(null);
   const [isMultiple, setIsMultiple] = useState(false);
   const [quantity, setQuantity] = useState("2");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [generatingQR, setGeneratingQR] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrItems, setQrItems] = useState<Array<{ item_code: string; item_name: string; department: string; qr: string }>>([]);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [itemFilter, setItemFilter] = useState("");
   const [page, setPage] = useState(1);
   const PER_PAGE = 10;
+
+  const [colsOpen, setColsOpen] = useState(false);
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set([
+    "item_code", "item", "department", "condition", "status", "purchase_price", "delivery_receipt",
+  ]));
+  const colsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false);
+    };
+    if (colsOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [colsOpen]);
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const setA = (k: string, v: string) =>
@@ -330,7 +357,7 @@ export default function ItemAssetsPage() {
     try {
       const payload = {
         ...assignForm,
-        assignable_id: Number(assignForm.assignable_id),
+        assignable_id: assignForm.assignable_type !== "others" ? Number(assignForm.assignable_id) : null,
       };
       await api.assign(assignRow.id, payload);
       toast.success("Asset assigned successfully.");
@@ -420,94 +447,57 @@ export default function ItemAssetsPage() {
           ),
         })),
       );
-
-      const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>QR Codes — Fixed Assets</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #fff; }
-    .page {
-      width: 210mm;
-      min-height: 297mm;
-      padding: 10mm;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6mm;
-      align-content: start;
-    }
-    .card {
-      border: 1px solid #d1d5db;
-      border-radius: 3mm;
-      padding: 5mm;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2.5mm;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-    .qr-img { width: 52mm; height: 52mm; }
-    .item-code {
-      font-family: 'Courier New', monospace;
-      font-size: 9.5pt;
-      font-weight: bold;
-      text-align: center;
-      color: #1a1f36;
-      letter-spacing: 0.5px;
-    }
-    .item-name {
-      font-size: 7.5pt;
-      color: #475569;
-      text-align: center;
-      line-height: 1.3;
-    }
-    .dept-tag {
-      font-size: 6.5pt;
-      color: #6366f1;
-      background: #eef2ff;
-      border-radius: 2mm;
-      padding: 0.5mm 2mm;
-      text-align: center;
-    }
-    @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      @page { size: A4 portrait; margin: 0; }
-    }
-  </style>
-</head>
-<body>
-  <div class="page">
-    ${items
-      .map(
-        (item) => `
-    <div class="card">
-      <img class="qr-img" src="${item.qr}" alt="${item.item_code}" />
-      <div class="item-code">${item.item_code}</div>
-      <div class="item-name">${item.item_name}</div>
-      ${item.department ? `<div class="dept-tag">${item.department}</div>` : ""}
-    </div>`,
-      )
-      .join("")}
-  </div>
-</body>
-</html>`;
-
-      const iframe = document.createElement("iframe");
-      iframe.style.cssText =
-        "position:fixed;top:0;left:0;width:0;height:0;border:0;visibility:hidden;";
-      iframe.srcdoc = html;
-      iframe.onload = () => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        setTimeout(() => document.body.removeChild(iframe), 500);
-      };
-      document.body.appendChild(iframe);
+      setQrItems(items);
+      setQrModalOpen(true);
     } finally {
       setGeneratingQR(false);
     }
+  };
+
+  const handleDownloadQR = () => {
+    // A4 in mm
+    const PAGE_W = 210;
+    const PAGE_H = 297;
+    const MARGIN = 10;
+    const COLS = 3;
+    const GAP = 6;
+    const QR_SIZE = 44;
+    const CODE_H = 6; // approx height for item-code text line
+    const CARD_PAD = 5;
+    const CARD_H = CARD_PAD * 2 + QR_SIZE + GAP / 2 + CODE_H;
+    const CARD_W = (PAGE_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+    qrItems.forEach((item, idx) => {
+      const cardsPerPage = COLS * Math.floor((PAGE_H - MARGIN * 2) / (CARD_H + GAP));
+      const col = idx % COLS;
+      const row = Math.floor((idx % cardsPerPage) / COLS);
+
+      if (idx > 0 && col === 0 && row === 0) doc.addPage();
+
+      const x = MARGIN + col * (CARD_W + GAP);
+      const y = MARGIN + row * (CARD_H + GAP);
+
+      // Card border
+      doc.setDrawColor(209, 213, 219);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(x, y, CARD_W, CARD_H, 2, 2, "S");
+
+      // QR image (data URL, strip prefix)
+      const imgData = item.qr.replace(/^data:image\/png;base64,/, "");
+      const qrX = x + CARD_W / 2 - QR_SIZE / 2;
+      const qrY = y + CARD_PAD;
+      doc.addImage(imgData, "PNG", qrX, qrY, QR_SIZE, QR_SIZE);
+
+      // Item code text
+      doc.setFont("courier", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(26, 31, 54);
+      doc.text(item.item_code, x + CARD_W / 2, qrY + QR_SIZE + 4, { align: "center" });
+    });
+
+    doc.save("qr-codes-fixed-assets.pdf");
   };
 
   const handleSearch = (val: string) => {
@@ -529,8 +519,11 @@ export default function ItemAssetsPage() {
     if (statusFilter) {
       result = result.filter((r) => r.status === statusFilter);
     }
+    if (itemFilter) {
+      result = result.filter((r) => r.item_id === Number(itemFilter));
+    }
     return result;
-  }, [rows, search, statusFilter]);
+  }, [rows, search, statusFilter, itemFilter]);
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id));
@@ -578,11 +571,26 @@ export default function ItemAssetsPage() {
     },
     { key: "item_code", label: "Item Code", className: "font-mono" },
     { key: "item", label: "Item", render: (r) => r.item?.name ?? "—" },
+    { key: "item_category", label: "Category", render: (r) => r.item?.category?.name ?? "—" },
+    { key: "item_brand", label: "Brand", render: (r) => r.item?.brand ?? "—" },
+    { key: "item_model", label: "Model", render: (r) => r.item?.model ?? "—" },
     {
+      key: "item_specifications",
+      label: "Specifications",
+      render: (r) => {
+        const s = r.item?.specifications;
+        if (!s) return <span className="text-gray-400">—</span>;
+        const text = Array.isArray(s)
+          ? s.join(" · ")
+          : Object.entries(s).map(([k, v]) => `${k}: ${v}`).join(", ");
+        return <span className="text-xs text-gray-600 line-clamp-2 max-w-48 block">{text}</span>;
+      },
+    },
+    ...(isAdmin ? [{
       key: "department",
       label: "Dept.",
-      render: (r) => r.department?.name ?? "—",
-    },
+      render: (r: ItemAsset) => r.department?.name ?? "—",
+    }] : []),
     {
       key: "condition",
       label: "Condition",
@@ -652,6 +660,13 @@ export default function ItemAssetsPage() {
             </button>
           )}
           <button
+            onClick={() => setViewRow(row)}
+            title="View details"
+            className="p-1.5 text-gray-400 hover:text-indigo-600 rounded"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+          <button
             onClick={() => openEdit(row)}
             className="p-1.5 text-gray-400 hover:text-blue-600 rounded"
           >
@@ -667,6 +682,26 @@ export default function ItemAssetsPage() {
       ),
     },
   ];
+
+  const toggleableCols = [
+    { key: "item_code",           label: "Item Code" },
+    { key: "item",                label: "Item" },
+    { key: "item_category",       label: "Category" },
+    { key: "item_brand",          label: "Brand" },
+    { key: "item_model",          label: "Model" },
+    { key: "item_specifications", label: "Specifications" },
+    ...(isAdmin ? [{ key: "department", label: "Dept." }] : []),
+    { key: "condition",           label: "Condition" },
+    { key: "status",              label: "Status" },
+    { key: "purchase_price",      label: "Value" },
+    { key: "delivery_receipt",    label: "Delivery Receipt" },
+    { key: "modified_by",         label: "Modified By" },
+    { key: "created_at",          label: "Created Date" },
+  ];
+
+  const visibleColumns = columns.filter(
+    (col) => col.key === "__select" || col.key === "actions" || visibleCols.has(col.key as string),
+  );
 
   const assetFormBody = (
     <div className="space-y-4">
@@ -871,6 +906,16 @@ export default function ItemAssetsPage() {
         placeholder="Search by code, item name, or serial…"
       >
         <select
+          value={itemFilter}
+          onChange={(e) => { setItemFilter(e.target.value); setPage(1); }}
+          className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white text-[#070505] focus:outline-none focus:ring-2 focus:ring-[#9bc6ef]"
+        >
+          <option value="">All Items</option>
+          {fixedItems.map((i: { id: number; name: string }) => (
+            <option key={i.id} value={i.id}>{i.name}</option>
+          ))}
+        </select>
+        <select
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
@@ -884,9 +929,42 @@ export default function ItemAssetsPage() {
           <option value="under_repair">Under Repair</option>
           <option value="disposed">Disposed</option>
         </select>
+        {/* Column visibility toggle */}
+        <div ref={colsRef} className="relative">
+          <button
+            onClick={() => setColsOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#9bc6ef] whitespace-nowrap"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Columns
+          </button>
+          {colsOpen && (
+            <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-lg p-3 min-w-[170px]">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Show Columns</p>
+              {toggleableCols.map((col) => (
+                <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.has(col.key)}
+                    onChange={() =>
+                      setVisibleCols((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(col.key)) next.delete(col.key);
+                        else next.add(col.key);
+                        return next;
+                      })
+                    }
+                    className="h-3.5 w-3.5 accent-indigo-600"
+                  />
+                  <span className="text-sm text-gray-700 group-hover:text-indigo-600">{col.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </FilterBar>
       <DataTable
-        columns={columns}
+        columns={visibleColumns}
         data={paged}
         loading={isLoading}
         keyExtractor={(r) => r.id}
@@ -961,25 +1039,33 @@ export default function ItemAssetsPage() {
               onChange={(e) => {
                 setA("assignable_type", e.target.value);
                 setA("assignable_id", "");
+                setA("assignable_label", "");
               }}
               options={[
                 { value: "employee", label: "Employee" },
                 { value: "department", label: "Department" },
+                { value: "others", label: "Others" },
               ]}
               required
             />
-            <Select
-              label={
-                assignForm.assignable_type === "employee"
-                  ? "Employee"
-                  : "Department"
-              }
-              value={assignForm.assignable_id}
-              onChange={(e) => setA("assignable_id", e.target.value)}
-              options={assignableOptions}
-              required
-              error={err("assignable_id")}
-            />
+            {assignForm.assignable_type === "others" ? (
+              <Textarea
+                label="Specify assignee / location"
+                value={assignForm.assignable_label}
+                onChange={(e) => setA("assignable_label", e.target.value)}
+                error={err("assignable_label")}
+                required
+              />
+            ) : (
+              <Select
+                label={assignForm.assignable_type === "employee" ? "Employee" : "Department"}
+                value={assignForm.assignable_id}
+                onChange={(e) => setA("assignable_id", e.target.value)}
+                options={assignableOptions}
+                required
+                error={err("assignable_id")}
+              />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input
@@ -1063,6 +1149,119 @@ export default function ItemAssetsPage() {
         loading={deleting}
         message={`Delete asset "${deleteRow?.item_code}"?`}
       />
+
+      {/* Asset Detail Viewer */}
+      <Modal
+        open={!!viewRow}
+        onClose={() => setViewRow(null)}
+        title={`Asset Details — ${viewRow?.item_code ?? ""}`}
+        size="lg"
+      >
+        {viewRow && (() => {
+          const item = viewRow.item;
+          const specs = item?.specifications;
+          const specsEntries: [string, string][] = specs
+            ? Array.isArray(specs)
+              ? specs.map((s, i) => [String(i + 1), s])
+              : Object.entries(specs)
+            : [];
+
+          const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+            <div className="flex items-start gap-2 py-2 border-b border-gray-100 last:border-0">
+              <span className="w-36 shrink-0 text-xs font-medium text-gray-500 uppercase tracking-wide pt-0.5">{label}</span>
+              <span className="text-sm text-gray-800 flex-1">{value ?? "—"}</span>
+            </div>
+          );
+
+          return (
+            <div className="space-y-5">
+              {/* Item Information */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-2">Item Information</h3>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-1">
+                  <DetailRow label="Name" value={item?.name} />
+                  <DetailRow label="Category" value={item?.category?.name} />
+                  <DetailRow label="Brand" value={item?.brand} />
+                  <DetailRow label="Model" value={item?.model} />
+                </div>
+                {specsEntries.length > 0 && (
+                  <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-2">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">Specifications</p>
+                    <ul className="space-y-1">
+                      {specsEntries.map(([k, v]) => (
+                        <li key={k} className="flex gap-2 text-sm">
+                          {!isNaN(Number(k)) ? (
+                            <span className="text-gray-700">• {v}</span>
+                          ) : (
+                            <>
+                              <span className="text-gray-500 shrink-0">{k}:</span>
+                              <span className="text-gray-800">{v}</span>
+                            </>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Asset Details */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-2">Asset Details</h3>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-1">
+                  <DetailRow label="Item Code" value={<span className="font-mono">{viewRow.item_code}</span>} />
+                  <DetailRow label="Department" value={viewRow.department?.name} />
+                  <DetailRow label="Condition" value={<Badge status={viewRow.condition} />} />
+                  <DetailRow label="Status" value={<Badge status={viewRow.status} />} />
+                  <DetailRow label="Value" value={formatCurrency(viewRow.purchase_price)} />
+                  <DetailRow label="Purchase Date" value={viewRow.purchase_date ? formatDate(viewRow.purchase_date) : null} />
+                  <DetailRow label="Warranty Expires" value={viewRow.warranty_expiry ? formatDate(viewRow.warranty_expiry) : null} />
+                  <DetailRow label="DR No." value={viewRow.delivery_receipt_no} />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* QR Code Preview */}
+      <Modal
+        open={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+        title={`QR Codes — ${qrItems.length} Asset${qrItems.length !== 1 ? "s" : ""}`}
+        size="xl"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setQrModalOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={handleDownloadQR}>
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+          </>
+        }
+      >
+        <div className="flex justify-center overflow-x-auto">
+          <div
+            className="bg-white border border-gray-200 shadow-sm grid grid-cols-3 gap-4 content-start"
+            style={{ width: "210mm", minHeight: "297mm", padding: "10mm" }}
+          >
+            {qrItems.map((item) => (
+              <div
+                key={item.item_code}
+                className="border border-gray-200 rounded-lg flex flex-col items-center gap-2 break-inside-avoid"
+                style={{ padding: "5mm" }}
+              >
+                <img src={item.qr} alt={item.item_code} style={{ width: "44mm", height: "44mm" }} />
+                <div className="font-mono text-xs font-bold text-center text-[#1a1f36] tracking-wide leading-snug">
+                  {item.item_code}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
 
       {/* Delivery Receipt Viewer */}
       <Modal
