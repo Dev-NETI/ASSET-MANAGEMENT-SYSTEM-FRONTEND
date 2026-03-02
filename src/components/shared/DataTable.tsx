@@ -8,7 +8,7 @@ import { rowVariant, staggerContainer } from '@/lib/motion';
 
 export interface Column<T> {
     key: string;
-    label: string;
+    label: ReactNode;
     className?: string;
     render?: (row: T) => ReactNode;
 }

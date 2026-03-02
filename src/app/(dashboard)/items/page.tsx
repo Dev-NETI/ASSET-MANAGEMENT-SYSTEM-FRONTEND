@@ -32,7 +32,7 @@ interface Item {
     item_type: 'fixed_asset' | 'consumable';
     brand: string | null;
     model: string | null;
-    specifications: string[] | null;
+    specifications: Record<string, string> | null;
     min_stock_level: number | null;
     department_id: number | null;
     category?: { id: number; name: string };
@@ -44,7 +44,7 @@ interface Item {
     modified_by?: string | null;
 }
 
-const empty = { name: '', description: '', category_id: '', unit_id: '', item_type: 'consumable', brand: '', model: '', min_stock_level: '' };
+const empty = { name: '', description: '', category_id: '', unit_id: '', item_type: 'consumable', brand: '', model: '', specifications: '', min_stock_level: '' };
 
 export default function ItemsPage() {
     const { user } = useAuth();
@@ -84,6 +84,9 @@ export default function ItemsPage() {
             name: row.name, description: row.description ?? '',
             category_id: String(row.category_id), unit_id: String(row.unit_id),
             item_type: row.item_type, brand: row.brand ?? '', model: row.model ?? '',
+            specifications: row.specifications
+                ? Object.entries(row.specifications).map(([k, v]) => `${k}: ${v}`).join('\n')
+                : '',
             min_stock_level: row.min_stock_level != null ? String(row.min_stock_level) : '',
         });
         setErrors({}); setEditRow(row);
@@ -92,11 +95,21 @@ export default function ItemsPage() {
     const handleSave = async () => {
         setSaving(true);
         try {
+            const specsText = form.specifications.trim();
+            const specifications = specsText
+                ? Object.fromEntries(
+                    specsText.split('\n')
+                        .map(line => line.split(':').map(s => s.trim()))
+                        .filter(parts => parts.length >= 2 && parts[0])
+                        .map(([k, ...rest]) => [k, rest.join(':').trim()])
+                  )
+                : null;
             const payload = {
                 ...form,
                 category_id: Number(form.category_id),
                 unit_id: Number(form.unit_id),
                 min_stock_level: form.min_stock_level ? Number(form.min_stock_level) : null,
+                specifications,
             };
             if (editRow) { await api.update(editRow.id, payload); toast.success('Item updated.'); setEditRow(null); }
             else         { await api.store(payload); toast.success('Item created.'); setCreateOpen(false); }
@@ -145,7 +158,15 @@ export default function ItemsPage() {
         { key: 'brand',          label: 'Brand',         render: r => r.brand ?? '—' },
         { key: 'model',          label: 'Model',         render: r => r.model ?? '—' },
         { key: 'name',           label: 'Name' },
-        { key: 'specifications', label: 'Specifications', render: r => r.specifications?.length ? r.specifications.join(', ') : '—' },
+        {
+            key: 'specifications', label: 'Specifications',
+            render: r => {
+                const specs = r.specifications;
+                if (!specs || typeof specs !== 'object') return '—';
+                const entries = Object.entries(specs);
+                return entries.length ? entries.map(([k, v]) => `${k}: ${v}`).join(', ') : '—';
+            },
+        },
         { key: 'item_type',      label: 'Item Type',     render: r => <Badge status={r.item_type} /> },
         {
             key: 'stock', label: 'Stock/Units',
@@ -183,11 +204,17 @@ export default function ItemsPage() {
                 <Input label="Brand" value={form.brand} onChange={e => set('brand', e.target.value)} error={err('brand')} />
                 <Input label="Model" value={form.model} onChange={e => set('model', e.target.value)} error={err('model')} />
             </div>
+            <Textarea
+                label="Specifications"
+                value={form.specifications}
+                onChange={e => set('specifications', e.target.value)}
+                error={err('specifications')}
+                placeholder={"Processor: Intel Core i5\nRAM: 16GB\nStorage: 512GB SSD"}
+            />
             {form.item_type === 'consumable' && (
                 <Input label="Min Stock Level" type="number" value={form.min_stock_level}
                     onChange={e => set('min_stock_level', e.target.value)} error={err('min_stock_level')} />
             )}
-            <Textarea label="Description" value={form.description} onChange={e => set('description', e.target.value)} error={err('description')} />
         </div>
     );
 
