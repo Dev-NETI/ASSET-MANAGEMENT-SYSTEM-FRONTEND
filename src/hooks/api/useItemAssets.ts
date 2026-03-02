@@ -16,10 +16,19 @@ const useItemAssets = () => {
     const returnAsset = (id: RouteParam, payload: Payload): Promise<AxiosResponse> =>
         axios.post(`${route}/${id}/return`, payload);
 
+    // Use a passthrough transformRequest so FormData is not JSON-stringified
+    // (the axios instance default Content-Type: application/json would otherwise
+    // cause FormData to be serialized as {} for File fields)
+    const uploadDR = (id: RouteParam, formData: FormData): Promise<AxiosResponse> =>
+        axios.post(`${route}/${id}/upload-dr`, formData, {
+            transformRequest: [(data: FormData) => data],
+        });
+
     return {
         ...useResource({ route }),
         assign,
         returnAsset,
+        uploadDR,
     };
 };
 
