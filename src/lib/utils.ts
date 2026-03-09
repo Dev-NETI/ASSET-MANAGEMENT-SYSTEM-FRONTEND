@@ -62,24 +62,24 @@ export function formatStatus(status: string | null | undefined): string {
 export function getStatusColor(status: string): string {
     const colors: Record<string, string> = {
         available:    'bg-emerald-50 text-emerald-700 border border-emerald-200',
-        assigned:     'bg-indigo-50 text-indigo-700 border border-indigo-200',
+        assigned:     'bg-[#0a1628] text-white border border-[#0a1628]',
         under_repair: 'bg-amber-50 text-amber-700 border border-amber-200',
-        disposed:     'bg-slate-100 text-slate-600 border border-slate-200',
+        disposed:     'bg-slate-100 text-slate-500 border border-slate-200',
         active:       'bg-emerald-50 text-emerald-700 border border-emerald-200',
-        returned:     'bg-slate-100 text-slate-600 border border-slate-200',
+        returned:     'bg-slate-100 text-slate-500 border border-slate-200',
         lost:         'bg-red-50 text-red-700 border border-red-200',
         inactive:     'bg-red-50 text-red-700 border border-red-200',
-        new:          'bg-teal-50 text-teal-700 border border-teal-200',
+        new:          'bg-blue-50 text-blue-700 border border-blue-200',
         good:         'bg-sky-50 text-sky-700 border border-sky-200',
         fair:         'bg-amber-50 text-amber-700 border border-amber-200',
         poor:         'bg-orange-50 text-orange-700 border border-orange-200',
         damaged:      'bg-red-50 text-red-700 border border-red-200',
-        fixed_asset:           'bg-indigo-50 text-indigo-700 border border-indigo-200',
-        consumable:            'bg-violet-50 text-violet-700 border border-violet-200',
-        system_administrator:  'bg-violet-50 text-violet-700 border border-violet-200',
+        fixed_asset:           'bg-[#0a1628] text-white border border-[#0a1628]',
+        consumable:            'bg-[#d4a853]/15 text-[#b8891f] border border-[#d4a853]/40',
+        system_administrator:  'bg-[#0a1628] text-white border border-[#0a1628]',
         employee:              'bg-sky-50 text-sky-700 border border-sky-200',
     };
-    return colors[status] ?? 'bg-slate-100 text-slate-600 border border-slate-200';
+    return colors[status] ?? 'bg-slate-100 text-slate-500 border border-slate-200';
 }
 
 // Truncate long strings

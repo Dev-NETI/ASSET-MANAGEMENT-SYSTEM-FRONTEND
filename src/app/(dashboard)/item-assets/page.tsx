@@ -570,6 +570,7 @@ export default function ItemAssetsPage() {
       ),
     },
     { key: "item_code", label: "Item Code", className: "font-mono" },
+    { key: "serial_number", label: "Serial No.", render: (r) => r.serial_number ?? "—", className: "font-mono" },
     { key: "item", label: "Item", render: (r) => r.item?.name ?? "—" },
     { key: "item_category", label: "Category", render: (r) => r.item?.category?.name ?? "—" },
     { key: "item_brand", label: "Brand", render: (r) => r.item?.brand ?? "—" },
@@ -685,6 +686,7 @@ export default function ItemAssetsPage() {
 
   const toggleableCols = [
     { key: "item_code",           label: "Item Code" },
+    { key: "serial_number",       label: "Serial No." },
     { key: "item",                label: "Item" },
     { key: "item_category",       label: "Category" },
     { key: "item_brand",          label: "Brand" },
