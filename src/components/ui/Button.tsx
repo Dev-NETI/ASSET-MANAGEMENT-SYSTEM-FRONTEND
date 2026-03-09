@@ -13,11 +13,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-    primary:   'bg-[#6366f1] text-white hover:bg-[#4f46e5] focus:ring-[#6366f1] shadow-sm shadow-indigo-500/25',
-    secondary: 'bg-white text-[#1e293b] border border-[#e2e8f0] hover:bg-[#f8fafc] focus:ring-[#6366f1]',
-    danger:    'bg-[#ef4444] text-white hover:bg-red-600 focus:ring-red-400',
-    ghost:     'text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#1e293b] focus:ring-[#6366f1]',
-    gold:      'bg-[#f59e0b] text-white hover:bg-amber-500 focus:ring-amber-400 shadow-sm shadow-amber-400/25',
+    primary:   'bg-primary text-white hover:bg-primary-dark focus:ring-primary/40 shadow-sm shadow-blue-900/20',
+    secondary: 'bg-white text-ink border border-border hover:bg-blue-50 hover:border-primary/30 focus:ring-primary/30',
+    danger:    'bg-danger text-white hover:bg-red-600 focus:ring-red-400/40 shadow-sm shadow-red-500/20',
+    ghost:     'text-muted hover:bg-blue-50 hover:text-ink focus:ring-primary/30',
+    gold:      'bg-gold text-white hover:bg-gold-dark focus:ring-gold/40 shadow-sm shadow-yellow-600/20',
 };
 
 const sizes = {
@@ -37,7 +37,7 @@ export default function Button({
 }: ButtonProps) {
     return (
         <motion.button
-            whileTap={{ scale: disabled || loading ? 1 : 0.97 }}
+            whileTap={disabled || loading ? {} : { scale: 0.96, transition: { type: 'spring', stiffness: 400, damping: 20 } }}
             disabled={disabled || loading}
             className={cn(
                 'inline-flex items-center justify-center gap-2 rounded-lg font-medium',

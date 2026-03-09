@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import useSWR from 'swr';
 import { motion } from 'framer-motion';
 import { useInventoryStocks } from '@/hooks/api/useInventoryStocks';
@@ -9,7 +9,8 @@ import PageHeader from '@/components/shared/PageHeader';
 import FilterBar from '@/components/shared/FilterBar';
 import DataTable, { Column } from '@/components/shared/DataTable';
 import Pagination from '@/components/ui/Pagination';
-import { AlertTriangle, PackageX } from 'lucide-react';
+import Button from '@/components/ui/Button';
+import { AlertTriangle, PackageX, SlidersHorizontal } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
 import { fadeUp } from '@/lib/motion';
 
@@ -32,10 +33,23 @@ export default function InventoryStocksPage() {
 
     const rows: InventoryStock[] = (res as { data?: { data?: InventoryStock[] } })?.data?.data ?? [];
 
-    const [search, setSearch]               = useState('');
+    const [search, setSearch]                 = useState('');
     const [belowMinFilter, setBelowMinFilter] = useState('');
-    const [page, setPage]                   = useState(1);
+    const [page, setPage]                     = useState(1);
     const PER_PAGE = 10;
+
+    const defaultCols = new Set(['item', 'quantity', 'min_stock', 'alert', ...(isAdmin ? ['department'] : [])]);
+    const [colsOpen, setColsOpen] = useState(false);
+    const [visibleCols, setVisibleCols] = useState<Set<string>>(defaultCols);
+    const colsRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     const handleSearch = (val: string) => { setSearch(val); setPage(1); };
 
@@ -56,6 +70,14 @@ export default function InventoryStocksPage() {
     const totalPages = Math.ceil(filtered.length / PER_PAGE);
     const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
+    const toggleableCols = [
+        { key: 'item',       label: 'Item' },
+        ...(isAdmin ? [{ key: 'department', label: 'Department' }] : []),
+        { key: 'quantity',   label: 'Quantity' },
+        { key: 'min_stock',  label: 'Min Level' },
+        { key: 'alert',      label: 'Alert' },
+    ];
+
     const columns: Column<InventoryStock>[] = [
         { key: 'item',     label: 'Item',     render: r => r.item?.name ?? '—' },
         ...(isAdmin ? [{ key: 'department', label: 'Department', render: (r: InventoryStock) => r.department?.name ?? '—' } as Column<InventoryStock>] : []),
@@ -75,6 +97,8 @@ export default function InventoryStocksPage() {
         },
     ];
 
+    const visibleColumns = columns.filter(c => visibleCols.has(c.key));
+
     return (
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
             <PageHeader title="Inventory Stock Levels" subtitle="Consumable stock quantities per item per department" />
@@ -88,8 +112,27 @@ export default function InventoryStocksPage() {
                     <option value="low">Below Minimum</option>
                     <option value="ok">Above Minimum</option>
                 </select>
+                <div className="relative" ref={colsRef}>
+                    <Button variant="secondary" onClick={() => setColsOpen(o => !o)}>
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Columns
+                    </Button>
+                    {colsOpen && (
+                        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-48">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Show Columns</p>
+                            {toggleableCols.map(c => (
+                                <label key={c.key} className="flex items-center gap-2 py-1 cursor-pointer text-sm text-gray-700 hover:text-gray-900">
+                                    <input type="checkbox" checked={visibleCols.has(c.key)}
+                                        onChange={e => setVisibleCols(prev => { const n = new Set(prev); e.target.checked ? n.add(c.key) : n.delete(c.key); return n; })}
+                                        className="rounded border-gray-300" />
+                                    {c.label}
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </FilterBar>
-            <DataTable columns={columns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
+            <DataTable columns={visibleColumns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
             <Pagination page={page} totalPages={totalPages} total={filtered.length} perPage={PER_PAGE} onPageChange={setPage} />
         </motion.div>
     );

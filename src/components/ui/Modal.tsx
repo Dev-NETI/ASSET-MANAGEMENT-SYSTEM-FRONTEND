@@ -4,7 +4,7 @@ import { ReactNode, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
-import { backdropVariant, scaleIn } from '@/lib/motion';
+import { backdropVariant } from '@/lib/motion';
 
 interface ModalProps {
     open: boolean;
@@ -37,7 +37,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     {/* Backdrop */}
                     <motion.div
-                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        className="absolute inset-0 bg-sidebar/65 backdrop-blur-md"
                         variants={backdropVariant}
                         initial="hidden"
                         animate="visible"
@@ -47,31 +47,30 @@ export default function Modal({ open, onClose, title, children, footer, size = '
                     {/* Dialog */}
                     <motion.div
                         className={cn(
-                            'relative z-10 w-full bg-white rounded-2xl shadow-2xl border border-[#e2e8f0] flex flex-col max-h-[90vh]',
+                            'relative z-10 w-full bg-white rounded-2xl shadow-2xl border border-border/60 flex flex-col max-h-[90vh]',
                             sizes[size]
                         )}
-                        variants={scaleIn}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
+                        initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                        animate={{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', damping: 28, stiffness: 350 } }}
+                        exit={{ opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.18 } }}
                     >
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-[#f1f5f9]">
-                            <h2 className="text-lg font-semibold text-[#1e293b]">{title}</h2>
+                        {/* Header — deep navy */}
+                        <div className="flex items-center justify-between px-6 py-4 bg-sidebar rounded-t-2xl">
+                            <h2 className="text-base font-semibold text-white tracking-wide">{title}</h2>
                             <button
                                 onClick={onClose}
-                                className="rounded-lg p-1 text-[#94a3b8] hover:text-[#6366f1] hover:bg-indigo-50 transition-colors"
+                                className="rounded-lg p-1.5 text-sidebar-text hover:text-gold hover:bg-white/10 transition-colors"
                             >
-                                <X className="h-5 w-5" />
+                                <X className="h-4 w-4" />
                             </button>
                         </div>
                         {/* Body */}
-                        <div className="px-6 py-4 overflow-y-auto flex-1">
+                        <div className="px-6 py-5 overflow-y-auto flex-1">
                             {children}
                         </div>
                         {/* Footer */}
                         {footer && (
-                            <div className="px-6 py-4 border-t border-[#f1f5f9] flex justify-end gap-3">
+                            <div className="px-6 py-4 border-t border-border/60 flex justify-end gap-3 bg-surface/50 rounded-b-2xl">
                                 {footer}
                             </div>
                         )}

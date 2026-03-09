@@ -18,13 +18,13 @@ export default function PageHeader({ title, subtitle, action }: PageHeaderProps)
             initial="hidden"
             animate="visible"
         >
-            <div className="border-l-4 border-[#6366f1] pl-3">
-                <h1 className="text-2xl font-bold text-[#1e293b]">{title}</h1>
+            <div className="border-l-4 border-gold pl-4">
+                <h1 className="text-2xl font-bold text-ink">{title}</h1>
                 {subtitle && (
-                    <p className="mt-0.5 text-sm text-[#64748b]">{subtitle}</p>
+                    <p className="mt-0.5 text-sm text-muted">{subtitle}</p>
                 )}
             </div>
-            {action && <div className="flex-shrink-0">{action}</div>}
+            {action && <div className="shrink-0">{action}</div>}
         </motion.div>
     );
 }

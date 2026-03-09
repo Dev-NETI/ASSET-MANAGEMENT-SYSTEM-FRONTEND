@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import useSWR from 'swr';
 import { motion } from 'framer-motion';
 import { useAssetAssignments } from '@/hooks/api/useAssetAssignments';
@@ -9,8 +9,10 @@ import FilterBar from '@/components/shared/FilterBar';
 import DataTable, { Column } from '@/components/shared/DataTable';
 import Pagination from '@/components/ui/Pagination';
 import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 import { formatDate } from '@/lib/utils';
 import { fadeUp } from '@/lib/motion';
+import { SlidersHorizontal } from 'lucide-react';
 
 interface AssetAssignment {
     id: number;
@@ -22,8 +24,9 @@ interface AssetAssignment {
     condition_on_return: string | null;
     purpose: string | null;
     asset?: { id: number; item_code: string; item?: { name: string } };
-    assignable?: { id: number; name?: string; first_name?: string; last_name?: string; full_name?: string };
-    assignable_type?: string;
+    assignable?: { id: number; name?: string; first_name?: string; last_name?: string; full_name?: string } | null;
+    assignable_type?: string | null;
+    assignable_label?: string | null;
     assigned_by_user?: { name: string };
     modified_by?: string | null;
 }
@@ -33,12 +36,25 @@ export default function AssetAssignmentsPage() {
     const { data: res, isLoading } = useSWR('/api/asset-assignments', () => api.index());
     const rows: AssetAssignment[] = (res as { data?: { data?: AssetAssignment[] } })?.data?.data ?? [];
 
-    const [search, setSearch]           = useState('');
+    const [search, setSearch]             = useState('');
     const [statusFilter, setStatusFilter] = useState('');
-    const [page, setPage]               = useState(1);
+    const [page, setPage]                 = useState(1);
     const PER_PAGE = 10;
 
+    const [colsOpen, setColsOpen] = useState(false);
+    const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['item_code', 'item_name', 'assigned_to', 'type', 'assigned_at', 'status']));
+    const colsRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
     const getAssignableName = (row: AssetAssignment) => {
+        if (row.assignable_label) return row.assignable_label;
         if (!row.assignable) return '—';
         return row.assignable.full_name ?? row.assignable.name ??
             `${row.assignable.first_name ?? ''} ${row.assignable.last_name ?? ''}`.trim();
@@ -66,19 +82,35 @@ export default function AssetAssignmentsPage() {
     const totalPages = Math.ceil(filtered.length / PER_PAGE);
     const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-    const columns: Column<AssetAssignment>[] = [
-        { key: 'item_code',    label: 'Asset Code',  render: r => <span className="font-mono">{r.asset?.item_code ?? '—'}</span> },
-        { key: 'item_name',    label: 'Item',        render: r => r.asset?.item?.name ?? '—' },
-        { key: 'assigned_to',  label: 'Assigned To', render: r => getAssignableName(r) },
-        { key: 'type',         label: 'Type',        render: r => r.assignable_type?.includes('Employee') ? 'Employee' : 'Department' },
-        { key: 'assigned_at',  label: 'Assigned',    render: r => formatDate(r.assigned_at, 'MMMM d, yyyy') },
-        { key: 'expected_return_date', label: 'Expected Return', render: r => r.expected_return_date ? formatDate(r.expected_return_date, 'MMMM d, yyyy') : '—' },
-        { key: 'returned_at',  label: 'Returned',    render: r => r.returned_at ? formatDate(r.returned_at, 'MMMM d, yyyy') : '—' },
-        { key: 'condition',    label: 'Condition',   render: r => <Badge status={r.condition_on_assign} /> },
-        { key: 'status',       label: 'Status',      render: r => <Badge status={r.status} /> },
-        { key: 'purpose',      label: 'Purpose',     render: r => r.purpose ?? '—' },
-        { key: 'modified_by',  label: 'Modified By', render: r => r.modified_by ?? '—' },
+    const toggleableCols = [
+        { key: 'item_code',            label: 'Asset Code' },
+        { key: 'item_name',            label: 'Item' },
+        { key: 'assigned_to',          label: 'Assigned To' },
+        { key: 'type',                 label: 'Type' },
+        { key: 'assigned_at',          label: 'Assigned' },
+        { key: 'expected_return_date', label: 'Expected Return' },
+        { key: 'returned_at',          label: 'Returned' },
+        { key: 'condition',            label: 'Condition' },
+        { key: 'status',               label: 'Status' },
+        { key: 'purpose',              label: 'Purpose' },
+        { key: 'modified_by',          label: 'Modified By' },
     ];
+
+    const columns: Column<AssetAssignment>[] = [
+        { key: 'item_code',            label: 'Asset Code',      render: r => <span className="font-mono">{r.asset?.item_code ?? '—'}</span> },
+        { key: 'item_name',            label: 'Item',            render: r => r.asset?.item?.name ?? '—' },
+        { key: 'assigned_to',          label: 'Assigned To',     render: r => getAssignableName(r) },
+        { key: 'type',                 label: 'Type',            render: r => !r.assignable_type ? 'Others' : r.assignable_type.includes('Employee') ? 'Employee' : 'Department' },
+        { key: 'assigned_at',          label: 'Assigned',        render: r => formatDate(r.assigned_at, 'MMMM d, yyyy') },
+        { key: 'expected_return_date', label: 'Expected Return', render: r => r.expected_return_date ? formatDate(r.expected_return_date, 'MMMM d, yyyy') : '—' },
+        { key: 'returned_at',          label: 'Returned',        render: r => r.returned_at ? formatDate(r.returned_at, 'MMMM d, yyyy') : '—' },
+        { key: 'condition',            label: 'Condition',       render: r => <Badge status={r.condition_on_assign} /> },
+        { key: 'status',               label: 'Status',          render: r => <Badge status={r.status} /> },
+        { key: 'purpose',              label: 'Purpose',         render: r => r.purpose ?? '—' },
+        { key: 'modified_by',          label: 'Modified By',     render: r => r.modified_by ?? '—' },
+    ];
+
+    const visibleColumns = columns.filter(c => visibleCols.has(c.key));
 
     return (
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
@@ -94,8 +126,27 @@ export default function AssetAssignmentsPage() {
                     <option value="returned">Returned</option>
                     <option value="lost">Lost</option>
                 </select>
+                <div className="relative" ref={colsRef}>
+                    <Button variant="secondary" onClick={() => setColsOpen(o => !o)}>
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Columns
+                    </Button>
+                    {colsOpen && (
+                        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-52">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Show Columns</p>
+                            {toggleableCols.map(c => (
+                                <label key={c.key} className="flex items-center gap-2 py-1 cursor-pointer text-sm text-gray-700 hover:text-gray-900">
+                                    <input type="checkbox" checked={visibleCols.has(c.key)}
+                                        onChange={e => setVisibleCols(prev => { const n = new Set(prev); e.target.checked ? n.add(c.key) : n.delete(c.key); return n; })}
+                                        className="rounded border-gray-300" />
+                                    {c.label}
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </FilterBar>
-            <DataTable columns={columns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
+            <DataTable columns={visibleColumns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
             <Pagination page={page} totalPages={totalPages} total={filtered.length} perPage={PER_PAGE} onPageChange={setPage} />
         </motion.div>
     );

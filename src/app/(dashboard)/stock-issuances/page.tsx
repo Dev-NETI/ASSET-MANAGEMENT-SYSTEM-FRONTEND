@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
@@ -18,7 +18,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
-import { Plus } from 'lucide-react';
+import { Plus, SlidersHorizontal } from 'lucide-react';
 import { formatDate, formatNumber, getCurrentDate } from '@/lib/utils';
 import { fadeUp } from '@/lib/motion';
 
@@ -70,6 +70,19 @@ export default function StockIssuancesPage() {
     const [search, setSearch] = useState('');
     const [page, setPage]     = useState(1);
     const PER_PAGE = 10;
+
+    const defaultCols = new Set(['item', 'issued_to', 'type', 'quantity', 'issued_at', ...(isAdmin ? ['from_department'] : [])]);
+    const [colsOpen, setColsOpen] = useState(false);
+    const [visibleCols, setVisibleCols] = useState<Set<string>>(defaultCols);
+    const colsRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
     const err = (k: string) => errors[k]?.[0];
@@ -135,6 +148,17 @@ export default function StockIssuancesPage() {
     const empOptions      = employees.map(e => ({ value: e.id, label: e.full_name ?? `${e.first_name} ${e.last_name}` }));
     const issuableOptions = form.issuable_type === 'employee' ? empOptions : deptOptions;
 
+    const toggleableCols = [
+        { key: 'item',            label: 'Item' },
+        ...(isAdmin ? [{ key: 'from_department', label: 'From Dept.' }] : []),
+        { key: 'issued_to',       label: 'Issued To' },
+        { key: 'type',            label: 'Type' },
+        { key: 'quantity',        label: 'Quantity' },
+        { key: 'purpose',         label: 'Purpose' },
+        { key: 'modified_by',     label: 'Modified By' },
+        { key: 'issued_at',       label: 'Date Issued' },
+    ];
+
     const columns: Column<StockIssuance>[] = [
         { key: 'item',            label: 'Item',        render: r => r.item?.name ?? '—' },
         ...(isAdmin ? [{ key: 'from_department', label: 'From Dept.', render: (r: StockIssuance) => r.from_department?.name ?? '—' } as Column<StockIssuance>] : []),
@@ -146,12 +170,34 @@ export default function StockIssuancesPage() {
         { key: 'issued_at',       label: 'Date Issued', render: r => formatDate(r.issued_at, 'MMMM d, yyyy') },
     ];
 
+    const visibleColumns = columns.filter(c => visibleCols.has(c.key));
+
     return (
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
             <PageHeader title="Stock Issuances" subtitle="Record consumable stock issued to employees or departments"
                 action={<Button onClick={() => { setForm({ ...empty, issued_at: getCurrentDate() }); setErrors({}); setCreateOpen(true); }}><Plus className="h-4 w-4" />Record Issuance</Button>} />
-            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by item name or issued to…" />
-            <DataTable columns={columns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
+            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by item name or issued to…">
+                <div className="relative" ref={colsRef}>
+                    <Button variant="secondary" onClick={() => setColsOpen(o => !o)}>
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Columns
+                    </Button>
+                    {colsOpen && (
+                        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-48">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Show Columns</p>
+                            {toggleableCols.map(c => (
+                                <label key={c.key} className="flex items-center gap-2 py-1 cursor-pointer text-sm text-gray-700 hover:text-gray-900">
+                                    <input type="checkbox" checked={visibleCols.has(c.key)}
+                                        onChange={e => setVisibleCols(prev => { const n = new Set(prev); e.target.checked ? n.add(c.key) : n.delete(c.key); return n; })}
+                                        className="rounded border-gray-300" />
+                                    {c.label}
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </FilterBar>
+            <DataTable columns={visibleColumns} data={paged} loading={isLoading} keyExtractor={r => r.id} />
             <Pagination page={page} totalPages={totalPages} total={filtered.length} perPage={PER_PAGE} onPageChange={setPage} />
 
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Record Stock Issuance" size="lg"
