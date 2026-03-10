@@ -20,7 +20,6 @@ import { fadeUp } from '@/lib/motion';
 interface Category {
     id: number;
     name: string;
-    code: string | null;
     description: string | null;
     parent_id: number | null;
     parent?: { id: number; name: string } | null;
@@ -29,7 +28,7 @@ interface Category {
     modified_by?: string | null;
 }
 
-const empty = { name: '', code: '', description: '' };
+const empty = { name: '', description: '' };
 
 export default function CategoriesPage() {
     const api = useCategories();
@@ -49,7 +48,7 @@ export default function CategoriesPage() {
     const PER_PAGE = 10;
 
     const [colsOpen, setColsOpen] = useState(false);
-    const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['name', 'code', 'description']));
+    const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['name', 'description']));
     const colsRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -65,7 +64,7 @@ export default function CategoriesPage() {
 
     const openCreate = () => { setForm({ ...empty }); setErrors({}); setCreateOpen(true); };
     const openEdit = (row: Category) => {
-        setForm({ name: row.name, code: row.code ?? '', description: row.description ?? '' });
+        setForm({ name: row.name, description: row.description ?? '' });
         setErrors({});
         setEditRow(row);
     };
@@ -113,10 +112,7 @@ export default function CategoriesPage() {
     const filtered = useMemo(() => {
         if (!search.trim()) return rows;
         const q = search.toLowerCase();
-        return rows.filter(r =>
-            r.name?.toLowerCase().includes(q) ||
-            r.code?.toLowerCase().includes(q)
-        );
+        return rows.filter(r => r.name?.toLowerCase().includes(q));
     }, [rows, search]);
 
     const totalPages = Math.ceil(filtered.length / PER_PAGE);
@@ -124,14 +120,12 @@ export default function CategoriesPage() {
 
     const toggleableCols = [
         { key: 'name',        label: 'Name' },
-        { key: 'code',        label: 'Code' },
         { key: 'description', label: 'Description' },
         { key: 'modified_by', label: 'Modified By' },
     ];
 
     const columns: Column<Category>[] = [
         { key: 'name',        label: 'Name' },
-        { key: 'code',        label: 'Code',        render: r => r.code ?? '—', className: 'font-mono' },
         { key: 'description', label: 'Description', render: r => r.description ?? '—' },
         { key: 'modified_by', label: 'Modified By', render: r => r.modified_by ?? '—' },
         {
@@ -149,10 +143,7 @@ export default function CategoriesPage() {
 
     const formFields = (
         <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-                <Input label="Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
-                <Input label="Code" value={form.code} onChange={e => set('code', e.target.value)} error={err('code')} />
-            </div>
+            <Input label="Name" value={form.name} onChange={e => set('name', e.target.value)} error={err('name')} required />
             <Textarea label="Description" value={form.description} onChange={e => set('description', e.target.value)} error={err('description')} />
         </div>
     );
@@ -161,7 +152,7 @@ export default function CategoriesPage() {
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
             <PageHeader title="Categories" subtitle="Manage item categories"
                 action={<Button onClick={openCreate}><Plus className="h-4 w-4" />Add Category</Button>} />
-            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name or code…">
+            <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name…">
                 <div className="relative" ref={colsRef}>
                     <Button variant="secondary" onClick={() => setColsOpen(o => !o)}>
                         <SlidersHorizontal className="h-4 w-4" />

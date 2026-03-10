@@ -10,7 +10,6 @@ interface AssetDetail {
   purchase_date: string | null;
   purchase_price: string | null;
   warranty_expiry: string | null;
-  condition: string;
   status: string;
   notes: string | null;
   delivery_receipt_no: string | null;
@@ -33,21 +32,10 @@ interface AssetDetail {
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  available:   { bg: "bg-emerald-100", text: "text-emerald-700", label: "Available" },
-  assigned:    { bg: "bg-blue-100",    text: "text-blue-700",    label: "Assigned" },
-  under_repair:{ bg: "bg-amber-100",   text: "text-amber-700",   label: "Under Repair" },
-  disposed:    { bg: "bg-red-100",     text: "text-red-700",     label: "Disposed" },
+  available: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Available" },
+  assigned:  { bg: "bg-blue-100",    text: "text-blue-700",    label: "Assigned" },
 };
 
-const CONDITION_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  new:     { bg: "bg-sky-100",     text: "text-sky-700",     label: "New" },
-  good:    { bg: "bg-emerald-100", text: "text-emerald-700", label: "Good" },
-  fair:    { bg: "bg-yellow-100",  text: "text-yellow-700",  label: "Fair" },
-  poor:    { bg: "bg-orange-100",  text: "text-orange-700",  label: "Poor" },
-  damaged: { bg: "bg-red-100",     text: "text-red-700",     label: "Damaged" },
-  lost:    { bg: "bg-gray-100",    text: "text-gray-700",    label: "Lost" },
-  disposed:{ bg: "bg-red-100",     text: "text-red-700",     label: "Disposed" },
-};
 
 function StatusBadge({ value, map }: { value: string; map: typeof STATUS_STYLES }) {
   const style = map[value] ?? { bg: "bg-gray-100", text: "text-gray-600", label: value };
@@ -162,8 +150,7 @@ export default function AssetDetailPage() {
               <p className="text-base text-gray-700 mt-1 font-medium">{asset.item?.name}</p>
             </div>
             <div className="flex flex-col items-end gap-1.5 shrink-0">
-              <StatusBadge value={asset.status}    map={STATUS_STYLES} />
-              <StatusBadge value={asset.condition} map={CONDITION_STYLES} />
+              <StatusBadge value={asset.status} map={STATUS_STYLES} />
             </div>
           </div>
         </div>

@@ -45,7 +45,6 @@ interface ItemAsset {
   purchase_date: string | null;
   purchase_price: number | null;
   warranty_expiry: string | null;
-  condition: string;
   department_id: number | null;
   status: string;
   notes: string | null;
@@ -72,7 +71,6 @@ const emptyAsset = {
   purchase_date: "",
   purchase_price: "",
   warranty_expiry: "",
-  condition: "new",
   department_id: "",
   notes: "",
   delivery_receipt_no: "",
@@ -83,19 +81,10 @@ const emptyAssign = {
   assignable_label: "",
   assigned_at: "",
   expected_return_date: "",
-  condition_on_assign: "good",
   purpose: "",
   notes: "",
 };
-const emptyReturn = { returned_at: "", condition_on_return: "good", notes: "" };
-
-const conditionOptions = [
-  { value: "new", label: "New" },
-  { value: "good", label: "Good" },
-  { value: "fair", label: "Fair" },
-  { value: "poor", label: "Poor" },
-  { value: "damaged", label: "Damaged" },
-];
+const emptyReturn = { returned_at: "", notes: "" };
 
 function generateNextItemCode(existingCodes: string[]): string | null {
   if (existingCodes.length === 0) return null;
@@ -221,6 +210,7 @@ export default function ItemAssetsPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [itemFilter, setItemFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const PER_PAGE = 10;
 
@@ -230,7 +220,6 @@ export default function ItemAssetsPage() {
       "item_code",
       "item",
       "department",
-      "condition",
       "status",
       "purchase_price",
       "delivery_receipt",
@@ -276,7 +265,6 @@ export default function ItemAssetsPage() {
       warranty_expiry: row.warranty_expiry
         ? formatDate(row.warranty_expiry, "yyyy-mm-dd")
         : "",
-      condition: row.condition,
       department_id: row.department_id ? String(row.department_id) : "",
       notes: row.notes ?? "",
       delivery_receipt_no: row.delivery_receipt_no ?? "",
@@ -591,8 +579,12 @@ export default function ItemAssetsPage() {
     if (itemFilter) {
       result = result.filter((r) => r.item_id === Number(itemFilter));
     }
+    if (statusFilter) {
+      result = result.filter((r) => r.status === statusFilter);
+    }
     return result;
-  }, [rows, search, categoryFilter, itemFilter]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, search, categoryFilter, itemFilter, statusFilter]);
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id));
@@ -698,11 +690,6 @@ export default function ItemAssetsPage() {
         ]
       : []),
     {
-      key: "condition",
-      label: "Condition",
-      render: (r) => <Badge status={r.condition} />,
-    },
-    {
       key: "status",
       label: "Status",
       render: (r) => <Badge status={r.status} />,
@@ -799,7 +786,6 @@ export default function ItemAssetsPage() {
     { key: "item_model", label: "Model" },
     { key: "item_specifications", label: "Specifications" },
     ...(isAdmin ? [{ key: "department", label: "Dept." }] : []),
-    { key: "condition", label: "Condition" },
     { key: "status", label: "Status" },
     { key: "purchase_price", label: "Value" },
     { key: "delivery_receipt", label: "Delivery Receipt" },
@@ -909,24 +895,14 @@ export default function ItemAssetsPage() {
           );
         })()}
 
-      <div className={editRow || !isMultiple ? "grid grid-cols-2 gap-4" : ""}>
-        {(editRow || !isMultiple) && (
-          <Input
-            label="Serial Number"
-            value={form.serial_number}
-            onChange={(e) => set("serial_number", e.target.value)}
-            error={err("serial_number")}
-          />
-        )}
-        <Select
-          label="Condition"
-          value={form.condition}
-          onChange={(e) => set("condition", e.target.value)}
-          options={conditionOptions}
-          error={err("condition")}
-          required
+      {(editRow || !isMultiple) && (
+        <Input
+          label="Serial Number"
+          value={form.serial_number}
+          onChange={(e) => set("serial_number", e.target.value)}
+          error={err("serial_number")}
         />
-      </div>
+      )}
       {showMacField && (
         <div>
           <Input
@@ -1052,6 +1028,7 @@ export default function ItemAssetsPage() {
         const hasActiveFilters = !!(
           categoryFilter ||
           itemFilter ||
+          statusFilter ||
           search.trim()
         );
         const selectCls =
@@ -1114,6 +1091,17 @@ export default function ItemAssetsPage() {
               ))}
             </select>
 
+            {/* Status */}
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              className={selectCls}
+            >
+              <option value="">All Statuses</option>
+              <option value="available">Available</option>
+              <option value="assigned">Assigned</option>
+            </select>
+
             {/* Clear filters */}
             {hasActiveFilters && (
               <button
@@ -1121,6 +1109,7 @@ export default function ItemAssetsPage() {
                   handleSearch("");
                   setCategoryFilter("");
                   setItemFilter("");
+                  setStatusFilter("");
                   setPage(1);
                 }}
                 className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
@@ -1298,13 +1287,6 @@ export default function ItemAssetsPage() {
               onChange={(e) => setA("expected_return_date", e.target.value)}
             />
           </div>
-          <Select
-            label="Condition on Assign"
-            value={assignForm.condition_on_assign}
-            onChange={(e) => setA("condition_on_assign", e.target.value)}
-            options={conditionOptions}
-            required
-          />
           <Input
             label="Purpose"
             value={assignForm.purpose}
@@ -1341,13 +1323,6 @@ export default function ItemAssetsPage() {
             type="date"
             value={returnForm.returned_at}
             onChange={(e) => setR("returned_at", e.target.value)}
-            required
-          />
-          <Select
-            label="Condition on Return"
-            value={returnForm.condition_on_return}
-            onChange={(e) => setR("condition_on_return", e.target.value)}
-            options={conditionOptions}
             required
           />
           <Textarea
@@ -1473,10 +1448,6 @@ export default function ItemAssetsPage() {
                     <DetailRow
                       label="Department"
                       value={viewRow.department?.name}
-                    />
-                    <DetailRow
-                      label="Condition"
-                      value={<Badge status={viewRow.condition} />}
                     />
                     <DetailRow
                       label="Status"
