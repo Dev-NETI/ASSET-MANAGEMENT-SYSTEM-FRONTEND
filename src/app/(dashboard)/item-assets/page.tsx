@@ -11,7 +11,6 @@ import { useItems } from "@/hooks/api/useItems";
 import { useDepartments } from "@/hooks/api/useDepartments";
 import { useEmployees } from "@/hooks/api/useEmployees";
 import PageHeader from "@/components/shared/PageHeader";
-import FilterBar from "@/components/shared/FilterBar";
 import DataTable, { Column } from "@/components/shared/DataTable";
 import Pagination from "@/components/ui/Pagination";
 import Modal from "@/components/ui/Modal";
@@ -21,7 +20,19 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import Badge from "@/components/ui/Badge";
-import { Plus, Pencil, Trash2, UserCheck, Undo2, QrCode, Eye, SlidersHorizontal, Download } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  UserCheck,
+  Undo2,
+  QrCode,
+  Eye,
+  SlidersHorizontal,
+  Download,
+  Search,
+  X,
+} from "lucide-react";
 import { formatDate, formatCurrency, getCurrentDate } from "@/lib/utils";
 import { fadeUp } from "@/lib/motion";
 
@@ -30,6 +41,7 @@ interface ItemAsset {
   item_id: number;
   item_code: string;
   serial_number: string | null;
+  mac_address: string | null;
   purchase_date: string | null;
   purchase_price: number | null;
   warranty_expiry: string | null;
@@ -56,6 +68,7 @@ const emptyAsset = {
   item_id: "",
   item_code: "",
   serial_number: "",
+  mac_address: "",
   purchase_date: "",
   purchase_price: "",
   warranty_expiry: "",
@@ -84,9 +97,7 @@ const conditionOptions = [
   { value: "damaged", label: "Damaged" },
 ];
 
-function generateNextItemCode(
-  existingCodes: string[],
-): string | null {
+function generateNextItemCode(existingCodes: string[]): string | null {
   if (existingCodes.length === 0) return null;
   let maxNum = -1;
   let maxCode = "";
@@ -94,7 +105,10 @@ function generateNextItemCode(
     const match = code.match(/^(.*?)(\d+)$/);
     if (match) {
       const n = parseInt(match[2], 10);
-      if (n > maxNum) { maxNum = n; maxCode = code; }
+      if (n > maxNum) {
+        maxNum = n;
+        maxCode = code;
+      }
     }
   }
   if (maxNum === -1 || !maxCode) return null;
@@ -103,7 +117,10 @@ function generateNextItemCode(
   return match[1] + String(maxNum + 1).padStart(match[2].length, "0");
 }
 
-function generateSequentialCodes(startCode: string, quantity: number): string[] {
+function generateSequentialCodes(
+  startCode: string,
+  quantity: number,
+): string[] {
   const codes: string[] = [startCode];
   for (let i = 1; i < quantity; i++) {
     const next = generateNextItemCode([codes[codes.length - 1]]);
@@ -151,8 +168,11 @@ export default function ItemAssetsPage() {
     (i: { item_type: string }) => i.item_type === "fixed_asset",
   );
   const departments =
-    (deptRes as { data?: { data?: { id: number; name: string }[] } })?.data
-      ?.data ?? [];
+    (
+      deptRes as {
+        data?: { data?: { id: number; name: string; code: string }[] };
+      }
+    )?.data?.data ?? [];
   const employees =
     (
       empRes as {
@@ -181,29 +201,47 @@ export default function ItemAssetsPage() {
 
   const [viewRow, setViewRow] = useState<ItemAsset | null>(null);
   const [drFile, setDrFile] = useState<File | null>(null);
-  const [drView, setDrView] = useState<{ url: string; label: string } | null>(null);
+  const [drView, setDrView] = useState<{ url: string; label: string } | null>(
+    null,
+  );
   const [isMultiple, setIsMultiple] = useState(false);
   const [quantity, setQuantity] = useState("2");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [generatingQR, setGeneratingQR] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [qrItems, setQrItems] = useState<Array<{ item_code: string; item_name: string; department: string; qr: string }>>([]);
+  const [qrItems, setQrItems] = useState<
+    Array<{
+      item_code: string;
+      item_name: string;
+      department: string;
+      qr: string;
+    }>
+  >([]);
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [itemFilter, setItemFilter] = useState("");
   const [page, setPage] = useState(1);
   const PER_PAGE = 10;
 
   const [colsOpen, setColsOpen] = useState(false);
-  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set([
-    "item_code", "item", "department", "condition", "status", "purchase_price", "delivery_receipt",
-  ]));
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(
+    new Set([
+      "item_code",
+      "item",
+      "department",
+      "condition",
+      "status",
+      "purchase_price",
+      "delivery_receipt",
+    ]),
+  );
   const colsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false);
+      if (colsRef.current && !colsRef.current.contains(e.target as Node))
+        setColsOpen(false);
     };
     if (colsOpen) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -229,6 +267,7 @@ export default function ItemAssetsPage() {
       item_id: String(row.item_id),
       item_code: row.item_code,
       serial_number: row.serial_number ?? "",
+      mac_address: row.mac_address ?? "",
       purchase_date: row.purchase_date
         ? formatDate(row.purchase_date, "yyyy-mm-dd")
         : "",
@@ -290,7 +329,10 @@ export default function ItemAssetsPage() {
         // Upload the same DR file to every created asset
         if (drFile) {
           const createdIds = responses
-            .map((r) => (r as { data?: { data?: { id: number } } })?.data?.data?.id)
+            .map(
+              (r) =>
+                (r as { data?: { data?: { id: number } } })?.data?.data?.id,
+            )
             .filter((id): id is number => !!id);
           await Promise.all(
             createdIds.map(async (id) => {
@@ -298,7 +340,9 @@ export default function ItemAssetsPage() {
                 const fd = new FormData();
                 fd.append("delivery_receipt_file", drFile);
                 await api.uploadDR(id, fd);
-              } catch { /* continue even if one upload fails */ }
+              } catch {
+                /* continue even if one upload fails */
+              }
             }),
           );
         }
@@ -317,7 +361,8 @@ export default function ItemAssetsPage() {
         savedId = editRow.id;
       } else {
         const res = await api.store(payload);
-        savedId = (res as { data?: { data?: { id: number } } })?.data?.data?.id ?? 0;
+        savedId =
+          (res as { data?: { data?: { id: number } } })?.data?.data?.id ?? 0;
       }
 
       // Upload DR file if one was selected
@@ -357,7 +402,10 @@ export default function ItemAssetsPage() {
     try {
       const payload = {
         ...assignForm,
-        assignable_id: assignForm.assignable_type !== "others" ? Number(assignForm.assignable_id) : null,
+        assignable_id:
+          assignForm.assignable_type !== "others"
+            ? Number(assignForm.assignable_id)
+            : null,
       };
       await api.assign(assignRow.id, payload);
       toast.success("Asset assigned successfully.");
@@ -443,7 +491,11 @@ export default function ItemAssetsPage() {
           department: asset.department?.name ?? "",
           qr: await QRCode.toDataURL(
             `${window.location.origin}/assets/${asset.item_code}`,
-            { width: 220, margin: 1, color: { dark: "#1a1f36", light: "#ffffff" } },
+            {
+              width: 220,
+              margin: 1,
+              color: { dark: "#1a1f36", light: "#ffffff" },
+            },
           ),
         })),
       );
@@ -467,10 +519,15 @@ export default function ItemAssetsPage() {
     const CARD_H = CARD_PAD * 2 + QR_SIZE + GAP / 2 + CODE_H;
     const CARD_W = (PAGE_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
 
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
 
     qrItems.forEach((item, idx) => {
-      const cardsPerPage = COLS * Math.floor((PAGE_H - MARGIN * 2) / (CARD_H + GAP));
+      const cardsPerPage =
+        COLS * Math.floor((PAGE_H - MARGIN * 2) / (CARD_H + GAP));
       const col = idx % COLS;
       const row = Math.floor((idx % cardsPerPage) / COLS);
 
@@ -494,7 +551,9 @@ export default function ItemAssetsPage() {
       doc.setFont("courier", "bold");
       doc.setFontSize(8);
       doc.setTextColor(26, 31, 54);
-      doc.text(item.item_code, x + CARD_W / 2, qrY + QR_SIZE + 4, { align: "center" });
+      doc.text(item.item_code, x + CARD_W / 2, qrY + QR_SIZE + 4, {
+        align: "center",
+      });
     });
 
     doc.save("qr-codes-fixed-assets.pdf");
@@ -504,6 +563,14 @@ export default function ItemAssetsPage() {
     setSearch(val);
     setPage(1);
   };
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Map<number, string>();
+    rows.forEach((r) => {
+      if (r.item?.category) cats.set(r.item.category.id, r.item.category.name);
+    });
+    return Array.from(cats.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [rows]);
 
   const filtered = useMemo(() => {
     let result = rows;
@@ -516,14 +583,16 @@ export default function ItemAssetsPage() {
           r.serial_number?.toLowerCase().includes(q),
       );
     }
-    if (statusFilter) {
-      result = result.filter((r) => r.status === statusFilter);
+    if (categoryFilter) {
+      result = result.filter(
+        (r) => r.item?.category?.id === Number(categoryFilter),
+      );
     }
     if (itemFilter) {
       result = result.filter((r) => r.item_id === Number(itemFilter));
     }
     return result;
-  }, [rows, search, statusFilter, itemFilter]);
+  }, [rows, search, categoryFilter, itemFilter]);
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id));
@@ -542,6 +611,17 @@ export default function ItemAssetsPage() {
   }));
   const assignableOptions =
     assignForm.assignable_type === "employee" ? empOptions : deptOptions;
+
+  // MAC address is only relevant for NOD (IT) department
+  const nodDeptId = departments.find((d) => d.code === "NOD")?.id;
+  const effectiveDeptId = isAdmin
+    ? form.department_id
+      ? Number(form.department_id)
+      : null
+    : (user?.department_id ?? null);
+  const isNodDept = nodDeptId !== undefined && effectiveDeptId === nodDeptId;
+  // Show MAC field only for NOD dept, and only when creating a single asset (not multiple)
+  const showMacField = isNodDept && (!!editRow || !isMultiple);
 
   const columns: Column<ItemAsset>[] = [
     {
@@ -570,9 +650,24 @@ export default function ItemAssetsPage() {
       ),
     },
     { key: "item_code", label: "Item Code", className: "font-mono" },
-    { key: "serial_number", label: "Serial No.", render: (r) => r.serial_number ?? "—", className: "font-mono" },
+    {
+      key: "serial_number",
+      label: "Serial No.",
+      render: (r) => r.serial_number ?? "—",
+      className: "font-mono",
+    },
+    {
+      key: "mac_address",
+      label: "MAC Address",
+      render: (r) => r.mac_address ?? "—",
+      className: "font-mono",
+    },
     { key: "item", label: "Item", render: (r) => r.item?.name ?? "—" },
-    { key: "item_category", label: "Category", render: (r) => r.item?.category?.name ?? "—" },
+    {
+      key: "item_category",
+      label: "Category",
+      render: (r) => r.item?.category?.name ?? "—",
+    },
     { key: "item_brand", label: "Brand", render: (r) => r.item?.brand ?? "—" },
     { key: "item_model", label: "Model", render: (r) => r.item?.model ?? "—" },
     {
@@ -583,15 +678,25 @@ export default function ItemAssetsPage() {
         if (!s) return <span className="text-gray-400">—</span>;
         const text = Array.isArray(s)
           ? s.join(" · ")
-          : Object.entries(s).map(([k, v]) => `${k}: ${v}`).join(", ");
-        return <span className="text-xs text-gray-600 line-clamp-2 max-w-48 block">{text}</span>;
+          : Object.entries(s)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(", ");
+        return (
+          <span className="text-xs text-gray-600 line-clamp-2 max-w-48 block">
+            {text}
+          </span>
+        );
       },
     },
-    ...(isAdmin ? [{
-      key: "department",
-      label: "Dept.",
-      render: (r: ItemAsset) => r.department?.name ?? "—",
-    }] : []),
+    ...(isAdmin
+      ? [
+          {
+            key: "department",
+            label: "Dept.",
+            render: (r: ItemAsset) => r.department?.name ?? "—",
+          },
+        ]
+      : []),
     {
       key: "condition",
       label: "Condition",
@@ -634,7 +739,7 @@ export default function ItemAssetsPage() {
     {
       key: "created_at",
       label: "Created Date",
-      render: (r) => r.created_at ? formatDate(r.created_at) : "—",
+      render: (r) => (r.created_at ? formatDate(r.created_at) : "—"),
     },
     {
       key: "actions",
@@ -685,24 +790,28 @@ export default function ItemAssetsPage() {
   ];
 
   const toggleableCols = [
-    { key: "item_code",           label: "Item Code" },
-    { key: "serial_number",       label: "Serial No." },
-    { key: "item",                label: "Item" },
-    { key: "item_category",       label: "Category" },
-    { key: "item_brand",          label: "Brand" },
-    { key: "item_model",          label: "Model" },
+    { key: "item_code", label: "Item Code" },
+    { key: "serial_number", label: "Serial No." },
+    { key: "mac_address", label: "MAC Address" },
+    { key: "item", label: "Item" },
+    { key: "item_category", label: "Category" },
+    { key: "item_brand", label: "Brand" },
+    { key: "item_model", label: "Model" },
     { key: "item_specifications", label: "Specifications" },
     ...(isAdmin ? [{ key: "department", label: "Dept." }] : []),
-    { key: "condition",           label: "Condition" },
-    { key: "status",              label: "Status" },
-    { key: "purchase_price",      label: "Value" },
-    { key: "delivery_receipt",    label: "Delivery Receipt" },
-    { key: "modified_by",         label: "Modified By" },
-    { key: "created_at",          label: "Created Date" },
+    { key: "condition", label: "Condition" },
+    { key: "status", label: "Status" },
+    { key: "purchase_price", label: "Value" },
+    { key: "delivery_receipt", label: "Delivery Receipt" },
+    { key: "modified_by", label: "Modified By" },
+    { key: "created_at", label: "Created Date" },
   ];
 
   const visibleColumns = columns.filter(
-    (col) => col.key === "__select" || col.key === "actions" || visibleCols.has(col.key as string),
+    (col) =>
+      col.key === "__select" ||
+      col.key === "actions" ||
+      visibleCols.has(col.key as string),
   );
 
   const assetFormBody = (
@@ -737,7 +846,9 @@ export default function ItemAssetsPage() {
           placeholder={
             form.item_id
               ? rows.some((r) => r.item_id === Number(form.item_id))
-                ? isMultiple ? "Auto-generated (starting)" : "Auto-generated"
+                ? isMultiple
+                  ? "Auto-generated (starting)"
+                  : "Auto-generated"
                 : "Enter starting code e.g. NOD-CAB-001"
               : "Select an item first"
           }
@@ -754,7 +865,10 @@ export default function ItemAssetsPage() {
             onChange={(e) => setIsMultiple(e.target.checked)}
             className="h-4 w-4 cursor-pointer accent-indigo-600 rounded"
           />
-          <label htmlFor="isMultiple" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+          <label
+            htmlFor="isMultiple"
+            className="text-sm font-medium text-gray-700 cursor-pointer select-none"
+          >
             Add multiple assets
           </label>
           {isMultiple && (
@@ -773,16 +887,27 @@ export default function ItemAssetsPage() {
       )}
 
       {/* Code preview when adding multiple */}
-      {!editRow && isMultiple && form.item_code && parseInt(quantity, 10) >= 2 && (() => {
-        const qty = Math.max(2, parseInt(quantity, 10) || 2);
-        const preview = generateSequentialCodes(form.item_code, Math.min(qty, 3));
-        const last = qty > 3 ? generateNthCode(form.item_code, qty) : null;
-        return (
-          <p className="text-xs text-gray-400 -mt-1 pl-1">
-            Will create: <span className="font-mono">{preview.join(", ")}{last ? ` … ${last}` : ""}</span>
-          </p>
-        );
-      })()}
+      {!editRow &&
+        isMultiple &&
+        form.item_code &&
+        parseInt(quantity, 10) >= 2 &&
+        (() => {
+          const qty = Math.max(2, parseInt(quantity, 10) || 2);
+          const preview = generateSequentialCodes(
+            form.item_code,
+            Math.min(qty, 3),
+          );
+          const last = qty > 3 ? generateNthCode(form.item_code, qty) : null;
+          return (
+            <p className="text-xs text-gray-400 -mt-1 pl-1">
+              Will create:{" "}
+              <span className="font-mono">
+                {preview.join(", ")}
+                {last ? ` … ${last}` : ""}
+              </span>
+            </p>
+          );
+        })()}
 
       <div className={editRow || !isMultiple ? "grid grid-cols-2 gap-4" : ""}>
         {(editRow || !isMultiple) && (
@@ -802,6 +927,20 @@ export default function ItemAssetsPage() {
           required
         />
       </div>
+      {showMacField && (
+        <div>
+          <Input
+            label="MAC Address"
+            value={form.mac_address}
+            onChange={(e) => set("mac_address", e.target.value)}
+            error={err("mac_address")}
+            placeholder="AA:BB:CC:DD:EE:FF"
+          />
+          <p className="text-xs text-gray-400 mt-0.5 pl-0.5">
+            Optional — only applicable to network devices
+          </p>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <Input
           label="Purchase Date"
@@ -853,15 +992,21 @@ export default function ItemAssetsPage() {
         />
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            DR File <span className="text-xs text-gray-400 font-normal">(PDF / image, optional{isMultiple && !editRow ? " — shared across all" : ""})</span>
+            DR File{" "}
+            <span className="text-xs text-gray-400 font-normal">
+              (PDF / image, optional
+              {isMultiple && !editRow ? " — shared across all" : ""})
+            </span>
           </label>
           {editRow?.delivery_receipt_file && !drFile && (
             <button
               type="button"
-              onClick={() => setDrView({
-                url: `${process.env.NEXT_PUBLIC_BACKEND_URL}/storage/${editRow.delivery_receipt_file}`,
-                label: editRow.delivery_receipt_no || "Current file",
-              })}
+              onClick={() =>
+                setDrView({
+                  url: `${process.env.NEXT_PUBLIC_BACKEND_URL}/storage/${editRow.delivery_receipt_file}`,
+                  label: editRow.delivery_receipt_no || "Current file",
+                })
+              }
               className="text-xs text-indigo-600 hover:underline block mb-1 text-left"
             >
               View current file ↗
@@ -902,69 +1047,134 @@ export default function ItemAssetsPage() {
           </div>
         }
       />
-      <FilterBar
-        search={search}
-        onSearchChange={handleSearch}
-        placeholder="Search by code, item name, or serial…"
-      >
-        <select
-          value={itemFilter}
-          onChange={(e) => { setItemFilter(e.target.value); setPage(1); }}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white text-[#070505] focus:outline-none focus:ring-2 focus:ring-[#9bc6ef]"
-        >
-          <option value="">All Items</option>
-          {fixedItems.map((i: { id: number; name: string }) => (
-            <option key={i.id} value={i.id}>{i.name}</option>
-          ))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white text-[#070505] focus:outline-none focus:ring-2 focus:ring-[#9bc6ef]"
-        >
-          <option value="">All Statuses</option>
-          <option value="available">Available</option>
-          <option value="assigned">Assigned</option>
-          <option value="under_repair">Under Repair</option>
-          <option value="disposed">Disposed</option>
-        </select>
-        {/* Column visibility toggle */}
-        <div ref={colsRef} className="relative">
-          <button
-            onClick={() => setColsOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#9bc6ef] whitespace-nowrap"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Columns
-          </button>
-          {colsOpen && (
-            <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-lg p-3 min-w-[170px]">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Show Columns</p>
-              {toggleableCols.map((col) => (
-                <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={visibleCols.has(col.key)}
-                    onChange={() =>
-                      setVisibleCols((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(col.key)) next.delete(col.key);
-                        else next.add(col.key);
-                        return next;
-                      })
-                    }
-                    className="h-3.5 w-3.5 accent-indigo-600"
-                  />
-                  <span className="text-sm text-gray-700 group-hover:text-indigo-600">{col.label}</span>
-                </label>
-              ))}
+      {/* Compact filter bar */}
+      {(() => {
+        const hasActiveFilters = !!(
+          categoryFilter ||
+          itemFilter ||
+          search.trim()
+        );
+        const selectCls =
+          "text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-[#070505] focus:outline-none focus:ring-2 focus:ring-[#9bc6ef] cursor-pointer";
+        return (
+          <div className="flex flex-wrap items-center gap-2 mb-4 bg-white border border-border/80 rounded-xl px-3 py-2 shadow-sm">
+            {/* Search */}
+            <div className="relative flex-1 min-w-40 max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gold pointer-events-none" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Search by code, item, serial…"
+                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-gray-200 bg-surface text-ink placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors"
+              />
+              {search && (
+                <button
+                  onClick={() => handleSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-ink"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      </FilterBar>
+
+            <div className="h-4 w-px bg-gray-200 shrink-0" />
+
+            {/* Category */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setPage(1);
+              }}
+              className={selectCls}
+            >
+              <option value="">All Categories</option>
+              {uniqueCategories.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+
+            {/* Item */}
+            <select
+              value={itemFilter}
+              onChange={(e) => {
+                setItemFilter(e.target.value);
+                setPage(1);
+              }}
+              className={selectCls}
+            >
+              <option value="">All Items</option>
+              {fixedItems.map((i: { id: number; name: string }) => (
+                <option key={i.id} value={i.id}>
+                  {i.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Clear filters */}
+            {hasActiveFilters && (
+              <button
+                onClick={() => {
+                  handleSearch("");
+                  setCategoryFilter("");
+                  setItemFilter("");
+                  setPage(1);
+                }}
+                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                <X className="h-3 w-3" />
+                Clear
+              </button>
+            )}
+
+            <div className="h-4 w-px bg-gray-200 shrink-0 ml-auto" />
+
+            {/* Columns toggle */}
+            <div ref={colsRef} className="relative">
+              <button
+                onClick={() => setColsOpen((v) => !v)}
+                className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#9bc6ef] whitespace-nowrap"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Columns
+              </button>
+              {colsOpen && (
+                <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-lg p-3 min-w-40">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    Show Columns
+                  </p>
+                  {toggleableCols.map((col) => (
+                    <label
+                      key={col.key}
+                      className="flex items-center gap-2 py-0.5 cursor-pointer group"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleCols.has(col.key)}
+                        onChange={() =>
+                          setVisibleCols((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(col.key)) next.delete(col.key);
+                            else next.add(col.key);
+                            return next;
+                          })
+                        }
+                        className="h-3.5 w-3.5 accent-indigo-600"
+                      />
+                      <span className="text-xs text-gray-700 group-hover:text-indigo-600">
+                        {col.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
       <DataTable
         columns={visibleColumns}
         data={paged}
@@ -1060,7 +1270,11 @@ export default function ItemAssetsPage() {
               />
             ) : (
               <Select
-                label={assignForm.assignable_type === "employee" ? "Employee" : "Department"}
+                label={
+                  assignForm.assignable_type === "employee"
+                    ? "Employee"
+                    : "Department"
+                }
                 value={assignForm.assignable_id}
                 onChange={(e) => setA("assignable_id", e.target.value)}
                 options={assignableOptions}
@@ -1159,71 +1373,144 @@ export default function ItemAssetsPage() {
         title={`Asset Details — ${viewRow?.item_code ?? ""}`}
         size="lg"
       >
-        {viewRow && (() => {
-          const item = viewRow.item;
-          const specs = item?.specifications;
-          const specsEntries: [string, string][] = specs
-            ? Array.isArray(specs)
-              ? specs.map((s, i) => [String(i + 1), s])
-              : Object.entries(specs)
-            : [];
+        {viewRow &&
+          (() => {
+            const item = viewRow.item;
+            const specs = item?.specifications;
+            const specsEntries: [string, string][] = specs
+              ? Array.isArray(specs)
+                ? specs.map((s, i) => [String(i + 1), s])
+                : Object.entries(specs)
+              : [];
 
-          const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-            <div className="flex items-start gap-2 py-2 border-b border-gray-100 last:border-0">
-              <span className="w-36 shrink-0 text-xs font-medium text-gray-500 uppercase tracking-wide pt-0.5">{label}</span>
-              <span className="text-sm text-gray-800 flex-1">{value ?? "—"}</span>
-            </div>
-          );
+            const DetailRow = ({
+              label,
+              value,
+            }: {
+              label: string;
+              value: React.ReactNode;
+            }) => (
+              <div className="flex items-start gap-2 py-2 border-b border-gray-100 last:border-0">
+                <span className="w-36 shrink-0 text-xs font-medium text-gray-500 uppercase tracking-wide pt-0.5">
+                  {label}
+                </span>
+                <span className="text-sm text-gray-800 flex-1">
+                  {value ?? "—"}
+                </span>
+              </div>
+            );
 
-          return (
-            <div className="space-y-5">
-              {/* Item Information */}
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-2">Item Information</h3>
-                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-1">
-                  <DetailRow label="Name" value={item?.name} />
-                  <DetailRow label="Category" value={item?.category?.name} />
-                  <DetailRow label="Brand" value={item?.brand} />
-                  <DetailRow label="Model" value={item?.model} />
-                </div>
-                {specsEntries.length > 0 && (
-                  <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-2">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">Specifications</p>
-                    <ul className="space-y-1">
-                      {specsEntries.map(([k, v]) => (
-                        <li key={k} className="flex gap-2 text-sm">
-                          {!isNaN(Number(k)) ? (
-                            <span className="text-gray-700">• {v}</span>
-                          ) : (
-                            <>
-                              <span className="text-gray-500 shrink-0">{k}:</span>
-                              <span className="text-gray-800">{v}</span>
-                            </>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+            return (
+              <div className="space-y-5">
+                {/* Item Information */}
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-2">
+                    Item Information
+                  </h3>
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-1">
+                    <DetailRow label="Name" value={item?.name} />
+                    <DetailRow label="Category" value={item?.category?.name} />
+                    <DetailRow label="Brand" value={item?.brand} />
+                    <DetailRow label="Model" value={item?.model} />
                   </div>
-                )}
-              </div>
+                  {specsEntries.length > 0 && (
+                    <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-2">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                        Specifications
+                      </p>
+                      <ul className="space-y-1">
+                        {specsEntries.map(([k, v]) => (
+                          <li key={k} className="flex gap-2 text-sm">
+                            {!isNaN(Number(k)) ? (
+                              <span className="text-gray-700">• {v}</span>
+                            ) : (
+                              <>
+                                <span className="text-gray-500 shrink-0">
+                                  {k}:
+                                </span>
+                                <span className="text-gray-800">{v}</span>
+                              </>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
 
-              {/* Asset Details */}
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-2">Asset Details</h3>
-                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-1">
-                  <DetailRow label="Item Code" value={<span className="font-mono">{viewRow.item_code}</span>} />
-                  <DetailRow label="Department" value={viewRow.department?.name} />
-                  <DetailRow label="Condition" value={<Badge status={viewRow.condition} />} />
-                  <DetailRow label="Status" value={<Badge status={viewRow.status} />} />
-                  <DetailRow label="Value" value={formatCurrency(viewRow.purchase_price)} />
-                  <DetailRow label="Purchase Date" value={viewRow.purchase_date ? formatDate(viewRow.purchase_date) : null} />
-                  <DetailRow label="Warranty Expires" value={viewRow.warranty_expiry ? formatDate(viewRow.warranty_expiry) : null} />
-                  <DetailRow label="DR No." value={viewRow.delivery_receipt_no} />
+                {/* Asset Details */}
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-2">
+                    Asset Details
+                  </h3>
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-1">
+                    <DetailRow
+                      label="Item Code"
+                      value={
+                        <span className="font-mono">{viewRow.item_code}</span>
+                      }
+                    />
+                    <DetailRow
+                      label="Serial No."
+                      value={
+                        viewRow.serial_number ? (
+                          <span className="font-mono">
+                            {viewRow.serial_number}
+                          </span>
+                        ) : null
+                      }
+                    />
+                    {viewRow.mac_address && (
+                      <DetailRow
+                        label="MAC Address"
+                        value={
+                          <span className="font-mono">
+                            {viewRow.mac_address}
+                          </span>
+                        }
+                      />
+                    )}
+                    <DetailRow
+                      label="Department"
+                      value={viewRow.department?.name}
+                    />
+                    <DetailRow
+                      label="Condition"
+                      value={<Badge status={viewRow.condition} />}
+                    />
+                    <DetailRow
+                      label="Status"
+                      value={<Badge status={viewRow.status} />}
+                    />
+                    <DetailRow
+                      label="Value"
+                      value={formatCurrency(viewRow.purchase_price)}
+                    />
+                    <DetailRow
+                      label="Purchase Date"
+                      value={
+                        viewRow.purchase_date
+                          ? formatDate(viewRow.purchase_date)
+                          : null
+                      }
+                    />
+                    <DetailRow
+                      label="Warranty Expires"
+                      value={
+                        viewRow.warranty_expiry
+                          ? formatDate(viewRow.warranty_expiry)
+                          : null
+                      }
+                    />
+                    <DetailRow
+                      label="DR No."
+                      value={viewRow.delivery_receipt_no}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
       </Modal>
 
       {/* QR Code Preview */}
@@ -1255,7 +1542,11 @@ export default function ItemAssetsPage() {
                 className="border border-gray-200 rounded-lg flex flex-col items-center gap-2 break-inside-avoid"
                 style={{ padding: "5mm" }}
               >
-                <img src={item.qr} alt={item.item_code} style={{ width: "44mm", height: "44mm" }} />
+                <img
+                  src={item.qr}
+                  alt={item.item_code}
+                  style={{ width: "44mm", height: "44mm" }}
+                />
                 <div className="font-mono text-xs font-bold text-center text-[#1a1f36] tracking-wide leading-snug">
                   {item.item_code}
                 </div>
@@ -1282,8 +1573,8 @@ export default function ItemAssetsPage() {
           </a>
         }
       >
-        {drView && (
-          drView.url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/) ? (
+        {drView &&
+          (drView.url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/) ? (
             <div className="flex items-center justify-center">
               <img
                 src={drView.url}
@@ -1298,8 +1589,7 @@ export default function ItemAssetsPage() {
               style={{ height: "70vh" }}
               title="Delivery Receipt"
             />
-          )
-        )}
+          ))}
       </Modal>
     </motion.div>
   );
