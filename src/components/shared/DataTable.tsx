@@ -84,7 +84,7 @@ export default function DataTable<T extends Record<string, any>>({
                 </thead>
                 <AnimatePresence mode="wait">
                     <motion.tbody
-                        key={data.length > 0 && keyExtractor ? `${keyExtractor(data[0])}-${data.length}` : data.length}
+                        key={data.length > 0 && keyExtractor ? String(keyExtractor(data[0])) : 'empty'}
                         className="divide-y divide-border/50"
                         variants={staggerContainer}
                         initial="hidden"
