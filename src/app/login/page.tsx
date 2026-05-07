@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/auth";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import { LayoutDashboard, Package, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { fadeUp, scaleIn } from "@/lib/motion";
 import Image from "next/image";
@@ -15,7 +14,7 @@ export default function LoginPage() {
     redirectIfAuthenticated: "/",
   });
 
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ email: "" });
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -69,8 +68,8 @@ export default function LoginPage() {
           initial="hidden"
           animate="visible"
         >
-          {/* NETI logo — gold-bordered frosted panel */}
-          <div className="bg-white/8 backdrop-blur-sm border border-gold/30 rounded-2xl px-8 py-5 mb-6 shadow-xl shadow-black/20">
+          {/* NETI logo */}
+          <div className="bg-white/15 backdrop-blur-sm border border-gold/30 rounded-2xl px-8 py-5 mb-6 shadow-xl shadow-black/20">
             <Image
               src="/assets/NETI.png"
               alt="NETI Logo"
@@ -80,29 +79,8 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-1 tracking-tight">Asset</h1>
-          <p className="text-gold/80 text-lg font-light mb-10 tracking-wide">Management System</p>
-
-          <div className="flex flex-col gap-3 w-full max-w-xs">
-            {[
-              { icon: LayoutDashboard, text: "Real-time dashboard insights" },
-              { icon: Package,         text: "Department-scoped inventory tracking" },
-              { icon: Users,           text: "Role-based access control" },
-            ].map(({ icon: Icon, text }, i) => (
-              <motion.div
-                key={text}
-                className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/8"
-                initial={{ opacity: 0, x: -16 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 + i * 0.1, duration: 0.35 }}
-              >
-                <div className="bg-gold/15 rounded-lg p-1.5 shrink-0">
-                  <Icon className="h-4 w-4 text-gold" />
-                </div>
-                <span className="text-sm text-sidebar-text text-left">{text}</span>
-              </motion.div>
-            ))}
-          </div>
+          <h1 className="text-3xl font-bold text-white mb-1 tracking-tight">Fixed &amp; Consumable Asset</h1>
+          <p className="text-gold/80 text-lg font-light tracking-wide">Management System</p>
         </motion.div>
       </div>
 
@@ -120,7 +98,7 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <h1 className="text-2xl font-bold text-ink">Inventory System</h1>
+          <h1 className="text-2xl font-bold text-ink text-center">Fixed &amp; Consumable Asset<br/>Management System</h1>
         </div>
 
         <motion.div
@@ -133,7 +111,7 @@ export default function LoginPage() {
           <div className="bg-white rounded-2xl shadow-2xl shadow-slate-200/80 border border-border border-t-4 border-t-gold p-8">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-ink tracking-tight">Welcome back</h2>
-              <p className="text-sm text-muted mt-1">Sign in to your account to continue</p>
+              <p className="text-sm text-muted mt-1">Enter your email and we&apos;ll send you a verification code</p>
             </div>
 
             {status && (
@@ -157,16 +135,6 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
               />
-              <Input
-                label="Password"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                error={errors.password?.[0]}
-                placeholder="••••••••"
-                required
-                autoComplete="current-password"
-              />
               <Button
                 type="submit"
                 variant="gold"
@@ -174,13 +142,13 @@ export default function LoginPage() {
                 loading={loading}
                 size="lg"
               >
-                Sign In
+                Send Code
               </Button>
             </form>
           </div>
 
           <p className="text-center text-xs text-sidebar-text mt-4">
-            Inventory Management System &copy; {new Date().getFullYear()}
+            Fixed &amp; Consumable Asset Management System &copy; {new Date().getFullYear()}
           </p>
         </motion.div>
       </div>

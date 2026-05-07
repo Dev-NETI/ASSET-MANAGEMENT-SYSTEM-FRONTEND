@@ -24,11 +24,21 @@ const useItemAssets = () => {
             transformRequest: [(data: FormData) => data],
         });
 
+    const uploadDocument = (id: RouteParam, formData: FormData): Promise<AxiosResponse> =>
+        axios.post(`${route}/${id}/documents`, formData, {
+            transformRequest: [(data: FormData) => data],
+        });
+
+    const deleteDocument = (assetId: RouteParam, docId: RouteParam): Promise<AxiosResponse> =>
+        axios.delete(`${route}/${assetId}/documents/${docId}`);
+
     return {
         ...useResource({ route }),
         assign,
         returnAsset,
         uploadDR,
+        uploadDocument,
+        deleteDocument,
     };
 };
 

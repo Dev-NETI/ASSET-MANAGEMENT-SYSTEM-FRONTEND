@@ -16,7 +16,6 @@ interface AuthUser {
 
 interface LoginProps {
     email: string;
-    password: string;
     setErrors: (errors: Record<string, string[]>) => void;
     setStatus: (status: string | null) => void;
 }
@@ -86,13 +85,18 @@ export const useAuth = ({ middleware, redirectIfAuthenticated }: UseAuthOptions 
             await mutate();
             router.push('/');
         } catch (err: unknown) {
-            const e = err as { response?: { status?: number; data?: { errors?: Record<string, string[]> } } };
+            const e = err as { response?: { status?: number; data?: { errors?: Record<string, string[]>; message?: string } } };
             if (e.response?.status === 422) {
-                setErrors(e.response.data?.errors ?? {});
+                const errors = e.response.data?.errors ?? {};
+                setErrors(errors);
+                // Show a status message for any validation error not tied to the email field
+                if (!errors.email) {
+                    setStatus(e.response.data?.message ?? 'Please check your input and try again.');
+                }
             } else if (e.response?.status === 401) {
                 setStatus('These credentials do not match our records.');
             } else {
-                throw err;
+                setStatus('Unable to connect. Please try again.');
             }
         }
     };
