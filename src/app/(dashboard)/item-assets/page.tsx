@@ -8,6 +8,8 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/auth";
 import { useItemAssets } from "@/hooks/api/useItemAssets";
 import { useItems } from "@/hooks/api/useItems";
+import { useCategories } from "@/hooks/api/useCategories";
+import { useUnits } from "@/hooks/api/useUnits";
 import { useDepartments } from "@/hooks/api/useDepartments";
 import { useEmployees } from "@/hooks/api/useEmployees";
 import PageHeader from "@/components/shared/PageHeader";
@@ -36,6 +38,14 @@ import {
 import { formatDate, formatCurrency, getCurrentDate } from "@/lib/utils";
 import { fadeUp } from "@/lib/motion";
 
+interface AssetDocument {
+  id: number;
+  item_asset_id: number;
+  file_path: string;
+  original_name: string;
+  created_at?: string | null;
+}
+
 interface ItemAsset {
   id: number;
   item_id: number;
@@ -50,6 +60,7 @@ interface ItemAsset {
   notes: string | null;
   delivery_receipt_no: string | null;
   delivery_receipt_file: string | null;
+  documents?: AssetDocument[];
   item?: {
     id: number;
     name: string;
@@ -133,6 +144,8 @@ export default function ItemAssetsPage() {
 
   const api = useItemAssets();
   const itemApi = useItems();
+  const categoryApi = useCategories();
+  const unitApi = useUnits();
   const deptApi = useDepartments();
   const empApi = useEmployees();
 
@@ -144,6 +157,8 @@ export default function ItemAssetsPage() {
   const { data: itemRes } = useSWR("/api/items-fa", () => itemApi.index());
   const { data: deptRes } = useSWR("/api/departments", () => deptApi.index());
   const { data: empRes } = useSWR("/api/employees", () => empApi.index());
+  const { data: catRes } = useSWR("/api/categories", () => categoryApi.index());
+  const { data: unitRes } = useSWR("/api/units", () => unitApi.index());
 
   const rows: ItemAsset[] =
     (res as { data?: { data?: ItemAsset[] } })?.data?.data ?? [];
@@ -175,6 +190,15 @@ export default function ItemAssetsPage() {
         };
       }
     )?.data?.data ?? [];
+  const categories =
+    (catRes as { data?: { data?: { id: number; name: string }[] } })?.data
+      ?.data ?? [];
+  const units =
+    (
+      unitRes as {
+        data?: { data?: { id: number; name: string; abbreviation: string }[] };
+      }
+    )?.data?.data ?? [];
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editRow, setEditRow] = useState<ItemAsset | null>(null);
@@ -189,7 +213,22 @@ export default function ItemAssetsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [viewRow, setViewRow] = useState<ItemAsset | null>(null);
-  const [drFile, setDrFile] = useState<File | null>(null);
+  const [docsListRow, setDocsListRow] = useState<ItemAsset | null>(null);
+
+  // Item autocomplete state
+  const [itemSearch, setItemSearch] = useState("");
+  const [itemDropdownOpen, setItemDropdownOpen] = useState(false);
+  const [isNewItem, setIsNewItem] = useState(false);
+  const [newItemForm, setNewItemForm] = useState({
+    description: "",
+    category_id: "",
+    unit_id: "",
+    brand: "",
+    model: "",
+    specifications: "",
+  });
+  const itemDropdownRef = useRef<HTMLDivElement>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [drView, setDrView] = useState<{ url: string; label: string } | null>(
     null,
   );
@@ -218,11 +257,12 @@ export default function ItemAssetsPage() {
   const [visibleCols, setVisibleCols] = useState<Set<string>>(
     new Set([
       "item_code",
+      "serial_number",
       "item",
       "department",
       "status",
       "purchase_price",
-      "delivery_receipt",
+      "documents",
     ]),
   );
   const colsRef = useRef<HTMLDivElement>(null);
@@ -236,7 +276,21 @@ export default function ItemAssetsPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, [colsOpen]);
 
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        itemDropdownRef.current &&
+        !itemDropdownRef.current.contains(e.target as Node)
+      )
+        setItemDropdownOpen(false);
+    };
+    if (itemDropdownOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [itemDropdownOpen]);
+
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const setNI = (k: string, v: string) =>
+    setNewItemForm((f) => ({ ...f, [k]: v }));
   const setA = (k: string, v: string) =>
     setAssignForm((f) => ({ ...f, [k]: v }));
   const setR = (k: string, v: string) =>
@@ -246,9 +300,19 @@ export default function ItemAssetsPage() {
   const openCreate = () => {
     setForm({ ...emptyAsset });
     setErrors({});
-    setDrFile(null);
+    setPendingFiles([]);
     setIsMultiple(false);
     setQuantity("2");
+    setItemSearch("");
+    setIsNewItem(false);
+    setNewItemForm({
+      description: "",
+      category_id: "",
+      unit_id: "",
+      brand: "",
+      model: "",
+      specifications: "",
+    });
     setCreateOpen(true);
   };
   const openEdit = (row: ItemAsset) => {
@@ -270,7 +334,7 @@ export default function ItemAssetsPage() {
       delivery_receipt_no: row.delivery_receipt_no ?? "",
     });
     setErrors({});
-    setDrFile(null);
+    setPendingFiles([]);
     setEditRow(row);
   };
   const openAssign = (row: ItemAsset) => {
@@ -287,9 +351,42 @@ export default function ItemAssetsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // If registering a brand-new item, create it first
+      let resolvedItemId = form.item_id ? Number(form.item_id) : 0;
+      if (!editRow && isNewItem && itemSearch.trim()) {
+        if (!newItemForm.category_id || !newItemForm.unit_id) {
+          setErrors({
+            category_id: newItemForm.category_id ? [] : ["Category is required."],
+            unit_id: newItemForm.unit_id ? [] : ["Unit is required."],
+          });
+          setSaving(false);
+          return;
+        }
+        const specs = newItemForm.specifications.trim()
+          ? newItemForm.specifications
+              .split("\n")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : null;
+        const itemCreateRes = await itemApi.store({
+          name: itemSearch.trim(),
+          description: newItemForm.description || null,
+          category_id: Number(newItemForm.category_id),
+          unit_id: Number(newItemForm.unit_id),
+          item_type: "fixed_asset",
+          brand: newItemForm.brand || null,
+          model: newItemForm.model || null,
+          specifications: specs,
+        });
+        resolvedItemId =
+          (itemCreateRes as { data?: { data?: { id: number } } })?.data?.data
+            ?.id ?? 0;
+        if (!resolvedItemId) throw new Error("Failed to create item.");
+      }
+
       const payload = {
         ...form,
-        item_id: Number(form.item_id),
+        item_id: resolvedItemId || Number(form.item_id),
         department_id: form.department_id ? Number(form.department_id) : null,
         purchase_price: form.purchase_price
           ? Number(form.purchase_price)
@@ -314,8 +411,8 @@ export default function ItemAssetsPage() {
           codes.map((code) => api.store({ ...payload, item_code: code })),
         );
 
-        // Upload the same DR file to every created asset
-        if (drFile) {
+        // Upload pending documents to every created asset
+        if (pendingFiles.length > 0) {
           const createdIds = responses
             .map(
               (r) =>
@@ -324,18 +421,20 @@ export default function ItemAssetsPage() {
             .filter((id): id is number => !!id);
           await Promise.all(
             createdIds.map(async (id) => {
-              try {
-                const fd = new FormData();
-                fd.append("delivery_receipt_file", drFile);
-                await api.uploadDR(id, fd);
-              } catch {
-                /* continue even if one upload fails */
+              for (const file of pendingFiles) {
+                try {
+                  const fd = new FormData();
+                  fd.append("file", file);
+                  await api.uploadDocument(id, fd);
+                } catch {
+                  /* continue even if one upload fails */
+                }
               }
             }),
           );
         }
 
-        setDrFile(null);
+        setPendingFiles([]);
         toast.success(`${qty} assets created.`);
         setCreateOpen(false);
         mutate();
@@ -353,18 +452,20 @@ export default function ItemAssetsPage() {
           (res as { data?: { data?: { id: number } } })?.data?.data?.id ?? 0;
       }
 
-      // Upload DR file if one was selected
-      if (drFile && savedId) {
-        try {
-          const fd = new FormData();
-          fd.append("delivery_receipt_file", drFile);
-          await api.uploadDR(savedId, fd);
-        } catch {
-          toast.error("Asset saved but delivery receipt upload failed.");
+      // Upload pending documents
+      if (pendingFiles.length > 0 && savedId) {
+        for (const file of pendingFiles) {
+          try {
+            const fd = new FormData();
+            fd.append("file", file);
+            await api.uploadDocument(savedId, fd);
+          } catch {
+            toast.error(`Failed to upload ${file.name}.`);
+          }
         }
       }
 
-      setDrFile(null);
+      setPendingFiles([]);
       if (editRow) {
         toast.success("Asset updated.");
         setEditRow(null);
@@ -426,6 +527,20 @@ export default function ItemAssetsPage() {
       else toast.error("Failed to return asset.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteDoc = async (docId: number) => {
+    if (!editRow) return;
+    try {
+      await api.deleteDocument(editRow.id, docId);
+      setEditRow((prev) =>
+        prev
+          ? { ...prev, documents: prev.documents?.filter((d) => d.id !== docId) ?? [] }
+          : null,
+      );
+    } catch {
+      toast.error("Failed to delete document.");
     }
   };
 
@@ -583,7 +698,7 @@ export default function ItemAssetsPage() {
       result = result.filter((r) => r.status === statusFilter);
     }
     return result;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, search, categoryFilter, itemFilter, statusFilter]);
 
   const allFilteredSelected =
@@ -597,6 +712,21 @@ export default function ItemAssetsPage() {
     label: i.name,
   }));
   const deptOptions = departments.map((d) => ({ value: d.id, label: d.name }));
+  const categoryOptions = categories.map((c) => ({
+    value: c.id,
+    label: c.name,
+  }));
+  const unitOptions = units.map((u) => ({
+    value: u.id,
+    label: u.abbreviation ? `${u.name} (${u.abbreviation})` : u.name,
+  }));
+  const itemMatches = useMemo(() => {
+    if (!itemSearch.trim()) return fixedItems.slice(0, 12);
+    const q = itemSearch.toLowerCase();
+    return fixedItems.filter((i: { name: string }) =>
+      i.name.toLowerCase().includes(q),
+    );
+  }, [fixedItems, itemSearch]);
   const empOptions = employees.map((e) => ({
     value: e.id,
     label: e.full_name ?? `${e.first_name} ${e.last_name}`,
@@ -700,22 +830,36 @@ export default function ItemAssetsPage() {
       render: (r) => formatCurrency(r.purchase_price),
     },
     {
-      key: "delivery_receipt",
-      label: "Delivery Receipt",
+      key: "documents",
+      label: "Documents",
       render: (r) => {
-        if (r.delivery_receipt_file) {
-          const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/storage/${r.delivery_receipt_file}`;
-          const label = r.delivery_receipt_no || "View DR";
+        const docs = r.documents ?? [];
+        if (docs.length === 0) return <span className="text-gray-400">—</span>;
+        if (docs.length === 1) {
           return (
             <button
-              onClick={() => setDrView({ url, label })}
-              className="text-indigo-600 hover:underline font-mono text-xs whitespace-nowrap text-left"
+              onClick={() =>
+                setDrView({
+                  url: `${process.env.NEXT_PUBLIC_BACKEND_URL}/storage/${docs[0].file_path}`,
+                  label: docs[0].original_name,
+                })
+              }
+              className="text-indigo-600 hover:underline text-xs whitespace-nowrap text-left"
             >
-              {label}
+              {docs[0].original_name.length > 20
+                ? docs[0].original_name.slice(0, 18) + "…"
+                : docs[0].original_name}
             </button>
           );
         }
-        return r.delivery_receipt_no || "—";
+        return (
+          <button
+            onClick={() => setDocsListRow(r)}
+            className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 whitespace-nowrap"
+          >
+            {docs.length} files
+          </button>
+        );
       },
     },
     {
@@ -788,7 +932,7 @@ export default function ItemAssetsPage() {
     ...(isAdmin ? [{ key: "department", label: "Dept." }] : []),
     { key: "status", label: "Status" },
     { key: "purchase_price", label: "Value" },
-    { key: "delivery_receipt", label: "Delivery Receipt" },
+    { key: "documents", label: "Documents" },
     { key: "modified_by", label: "Modified By" },
     { key: "created_at", label: "Created Date" },
   ];
@@ -803,25 +947,90 @@ export default function ItemAssetsPage() {
   const assetFormBody = (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <Select
-          label="Item"
-          value={form.item_id}
-          onChange={(e) => {
-            const itemId = e.target.value;
-            set("item_id", itemId);
-            if (!editRow) {
-              const existingCodes = rows
-                .filter((r) => r.item_id === Number(itemId))
-                .map((r) => r.item_code);
-              const next = generateNextItemCode(existingCodes);
-              set("item_code", next ?? "");
-            }
-          }}
-          options={itemOptions}
-          error={err("item_id")}
-          required
-          disabled={!!editRow}
-        />
+        {/* ── Item autocomplete ── */}
+        {editRow ? (
+          <Input
+            label="Item"
+            value={editRow.item?.name ?? String(form.item_id)}
+            onChange={() => {}}
+            disabled
+          />
+        ) : (
+          <div className="relative" ref={itemDropdownRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Item (Fixed Asset){" "}
+              <span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <input
+              type="text"
+              value={itemSearch}
+              onChange={(e) => {
+                setItemSearch(e.target.value);
+                set("item_id", "");
+                setIsNewItem(false);
+                setItemDropdownOpen(true);
+              }}
+              onFocus={() => setItemDropdownOpen(true)}
+              placeholder="Type to search or create…"
+              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${err("item_id") ? "border-red-400" : "border-gray-300"}`}
+            />
+            {err("item_id") && (
+              <p className="mt-1 text-xs text-red-500">{err("item_id")}</p>
+            )}
+            {itemDropdownOpen && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                {itemMatches.length === 0 && !itemSearch.trim() && (
+                  <p className="px-3 py-2 text-xs text-gray-400">
+                    No fixed-asset items found.
+                  </p>
+                )}
+                {itemMatches.map(
+                  (item: { id: number; name: string }) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        set("item_id", String(item.id));
+                        setItemSearch(item.name);
+                        setIsNewItem(false);
+                        setItemDropdownOpen(false);
+                        const existingCodes = rows
+                          .filter((r) => r.item_id === item.id)
+                          .map((r) => r.item_code);
+                        const next = generateNextItemCode(existingCodes);
+                        set("item_code", next ?? "");
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
+                    >
+                      {item.name}
+                    </button>
+                  ),
+                )}
+                {itemSearch.trim() &&
+                  !fixedItems.some(
+                    (i: { name: string }) =>
+                      i.name.toLowerCase() === itemSearch.toLowerCase(),
+                  ) && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setIsNewItem(true);
+                        setItemDropdownOpen(false);
+                        set("item_id", "");
+                        set("item_code", "");
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 border-t border-gray-100 flex items-center gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5 shrink-0" />
+                      Create new item: &ldquo;{itemSearch}&rdquo;
+                    </button>
+                  )}
+              </div>
+            )}
+          </div>
+        )}
         <Input
           label={!editRow && isMultiple ? "Starting Item Code" : "Item Code"}
           value={form.item_code}
@@ -840,6 +1049,61 @@ export default function ItemAssetsPage() {
           }
         />
       </div>
+
+      {/* ── Inline new-item form ── */}
+      {!editRow && isNewItem && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+          <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
+            New Item Details —{" "}
+            <span className="font-normal normal-case text-indigo-500">
+              item_type will be set to <em>fixed_asset</em> automatically
+            </span>
+          </p>
+          <Textarea
+            label="Description"
+            value={newItemForm.description}
+            onChange={(e) => setNI("description", e.target.value)}
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Category"
+              value={newItemForm.category_id}
+              onChange={(e) => setNI("category_id", e.target.value)}
+              options={categoryOptions}
+              required
+              error={errors.category_id?.[0]}
+            />
+            <Select
+              label="Unit"
+              value={newItemForm.unit_id}
+              onChange={(e) => setNI("unit_id", e.target.value)}
+              options={unitOptions}
+              required
+              error={errors.unit_id?.[0]}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Brand"
+              value={newItemForm.brand}
+              onChange={(e) => setNI("brand", e.target.value)}
+              placeholder="e.g. Dell"
+            />
+            <Input
+              label="Model"
+              value={newItemForm.model}
+              onChange={(e) => setNI("model", e.target.value)}
+              placeholder="e.g. Latitude 5520"
+            />
+          </div>
+          <Textarea
+            label="Specifications"
+            value={newItemForm.specifications}
+            onChange={(e) => setNI("specifications", e.target.value)}
+            placeholder={"One spec per line, e.g.\n16GB RAM\nIntel Core i7\n512GB SSD"}
+          />
+        </div>
+      )}
 
       {/* Add Multiple toggle — create mode only */}
       {!editRow && (
@@ -958,43 +1222,56 @@ export default function ItemAssetsPage() {
         onChange={(e) => set("notes", e.target.value)}
         error={err("notes")}
       />
-      <div className="grid grid-cols-2 gap-4">
-        <Input
-          label="Delivery Receipt No."
-          value={form.delivery_receipt_no}
-          onChange={(e) => set("delivery_receipt_no", e.target.value)}
-          error={err("delivery_receipt_no")}
-          placeholder="e.g. DR-2024-001"
+      {/* Related Purchase Documents */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Related Purchase Documents{" "}
+          <span className="text-xs text-gray-400 font-normal">
+            (PDF / image / Office files, optional
+            {isMultiple && !editRow ? " — uploaded to each asset" : ""})
+          </span>
+        </label>
+        {/* Existing documents — edit mode only */}
+        {editRow && (editRow.documents ?? []).length > 0 && (
+          <div className="mb-2 space-y-1 rounded-lg border border-gray-100 bg-gray-50 p-2">
+            {(editRow.documents ?? []).map((doc) => (
+              <div key={doc.id} className="flex items-center gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDrView({
+                      url: `${process.env.NEXT_PUBLIC_BACKEND_URL}/storage/${doc.file_path}`,
+                      label: doc.original_name,
+                    })
+                  }
+                  className="flex-1 truncate text-left text-xs text-indigo-600 hover:underline"
+                >
+                  {doc.original_name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteDoc(doc.id)}
+                  className="shrink-0 rounded p-0.5 text-gray-400 hover:text-red-600"
+                  title="Remove document"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input
+          type="file"
+          multiple
+          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+          onChange={(e) => setPendingFiles(Array.from(e.target.files ?? []))}
+          className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
         />
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            DR File{" "}
-            <span className="text-xs text-gray-400 font-normal">
-              (PDF / image, optional
-              {isMultiple && !editRow ? " — shared across all" : ""})
-            </span>
-          </label>
-          {editRow?.delivery_receipt_file && !drFile && (
-            <button
-              type="button"
-              onClick={() =>
-                setDrView({
-                  url: `${process.env.NEXT_PUBLIC_BACKEND_URL}/storage/${editRow.delivery_receipt_file}`,
-                  label: editRow.delivery_receipt_no || "Current file",
-                })
-              }
-              className="text-xs text-indigo-600 hover:underline block mb-1 text-left"
-            >
-              View current file ↗
-            </button>
-          )}
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            onChange={(e) => setDrFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-          />
-        </div>
+        {pendingFiles.length > 0 && (
+          <p className="mt-1 text-xs text-gray-400">
+            {pendingFiles.length} file{pendingFiles.length > 1 ? "s" : ""} selected — will be uploaded on save
+          </p>
+        )}
       </div>
     </div>
   );
@@ -1094,7 +1371,10 @@ export default function ItemAssetsPage() {
             {/* Status */}
             <select
               value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
               className={selectCls}
             >
               <option value="">All Statuses</option>
@@ -1473,12 +1753,35 @@ export default function ItemAssetsPage() {
                           : null
                       }
                     />
-                    <DetailRow
-                      label="DR No."
-                      value={viewRow.delivery_receipt_no}
-                    />
                   </div>
                 </div>
+
+                {/* Purchase Documents */}
+                {(viewRow.documents ?? []).length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-2">
+                      Related Purchase Documents
+                    </h3>
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-2 space-y-1">
+                      {(viewRow.documents ?? []).map((doc) => (
+                        <div key={doc.id} className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDrView({
+                                url: `${process.env.NEXT_PUBLIC_BACKEND_URL}/storage/${doc.file_path}`,
+                                label: doc.original_name,
+                              })
+                            }
+                            className="text-xs text-indigo-600 hover:underline text-left truncate"
+                          >
+                            {doc.original_name}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -1527,11 +1830,62 @@ export default function ItemAssetsPage() {
         </div>
       </Modal>
 
-      {/* Delivery Receipt Viewer */}
+      {/* Documents List Modal */}
+      <Modal
+        open={!!docsListRow}
+        onClose={() => setDocsListRow(null)}
+        title={`Purchase Documents — ${docsListRow?.item_code ?? ""}`}
+        size="sm"
+      >
+        {docsListRow && (
+          <div className="space-y-2">
+            {(docsListRow.documents ?? []).map((doc, idx) => {
+              const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/storage/${doc.file_path}`;
+              const ext = doc.original_name.split(".").pop()?.toLowerCase() ?? "";
+              const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
+              const isPdf = ext === "pdf";
+              const icon = isPdf ? "📄" : isImage ? "🖼️" : "📎";
+              return (
+                <div
+                  key={doc.id}
+                  className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5"
+                >
+                  <span className="text-lg leading-none shrink-0">{icon}</span>
+                  <span className="flex-1 text-sm text-gray-700 truncate" title={doc.original_name}>
+                    <span className="text-xs text-gray-400 mr-1">#{idx + 1}</span>
+                    {doc.original_name}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        setDocsListRow(null);
+                        setDrView({ url, label: doc.original_name });
+                      }}
+                      className="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 border border-indigo-200"
+                    >
+                      View
+                    </button>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 border border-gray-200"
+                    >
+                      ↗
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
+
+      {/* Document Viewer */}
       <Modal
         open={!!drView}
         onClose={() => setDrView(null)}
-        title={`Delivery Receipt — ${drView?.label ?? ""}`}
+        title={drView?.label ?? "Document"}
         size="xl"
         footer={
           <a
