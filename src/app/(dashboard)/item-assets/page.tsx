@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { formatDate, formatCurrency, getCurrentDate } from "@/lib/utils";
 import { fadeUp } from "@/lib/motion";
+import ExcelImportButton from "@/components/shared/ExcelImportButton";
 
 interface AssetDocument {
   id: number;
@@ -152,6 +153,7 @@ export default function ItemAssetsPage() {
   const {
     data: res,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR("/api/item-assets", () => api.index());
   const { data: itemRes } = useSWR("/api/items-fa", () => itemApi.index());
@@ -356,7 +358,9 @@ export default function ItemAssetsPage() {
       if (!editRow && isNewItem && itemSearch.trim()) {
         if (!newItemForm.category_id || !newItemForm.unit_id) {
           setErrors({
-            category_id: newItemForm.category_id ? [] : ["Category is required."],
+            category_id: newItemForm.category_id
+              ? []
+              : ["Category is required."],
             unit_id: newItemForm.unit_id ? [] : ["Unit is required."],
           });
           setSaving(false);
@@ -437,7 +441,7 @@ export default function ItemAssetsPage() {
         setPendingFiles([]);
         toast.success(`${qty} assets created.`);
         setCreateOpen(false);
-        mutate();
+        mutate(api.index());
         return;
       }
 
@@ -473,7 +477,7 @@ export default function ItemAssetsPage() {
         toast.success("Asset created.");
         setCreateOpen(false);
       }
-      mutate();
+      mutate(api.index());
     } catch (e: unknown) {
       const er = e as {
         response?: { data?: { errors?: Record<string, string[]> } };
@@ -499,7 +503,7 @@ export default function ItemAssetsPage() {
       await api.assign(assignRow.id, payload);
       toast.success("Asset assigned successfully.");
       setAssignRow(null);
-      mutate();
+      mutate(api.index());
     } catch (e: unknown) {
       const er = e as {
         response?: { data?: { errors?: Record<string, string[]> } };
@@ -518,7 +522,7 @@ export default function ItemAssetsPage() {
       await api.returnAsset(returnRow.id, returnForm);
       toast.success("Asset returned.");
       setReturnRow(null);
-      mutate();
+      mutate(api.index());
     } catch (e: unknown) {
       const er = e as {
         response?: { data?: { errors?: Record<string, string[]> } };
@@ -536,7 +540,10 @@ export default function ItemAssetsPage() {
       await api.deleteDocument(editRow.id, docId);
       setEditRow((prev) =>
         prev
-          ? { ...prev, documents: prev.documents?.filter((d) => d.id !== docId) ?? [] }
+          ? {
+              ...prev,
+              documents: prev.documents?.filter((d) => d.id !== docId) ?? [],
+            }
           : null,
       );
     } catch {
@@ -551,7 +558,7 @@ export default function ItemAssetsPage() {
       await api.destroy(deleteRow.id);
       toast.success("Asset deleted.");
       setDeleteRow(null);
-      mutate();
+      mutate(api.index());
     } catch {
       toast.error("Cannot delete: asset has active assignment.");
     } finally {
@@ -958,8 +965,7 @@ export default function ItemAssetsPage() {
         ) : (
           <div className="relative" ref={itemDropdownRef}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Item (Fixed Asset){" "}
-              <span className="text-red-500 ml-0.5">*</span>
+              Item (Fixed Asset) <span className="text-red-500 ml-0.5">*</span>
             </label>
             <input
               type="text"
@@ -984,29 +990,27 @@ export default function ItemAssetsPage() {
                     No fixed-asset items found.
                   </p>
                 )}
-                {itemMatches.map(
-                  (item: { id: number; name: string }) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        set("item_id", String(item.id));
-                        setItemSearch(item.name);
-                        setIsNewItem(false);
-                        setItemDropdownOpen(false);
-                        const existingCodes = rows
-                          .filter((r) => r.item_id === item.id)
-                          .map((r) => r.item_code);
-                        const next = generateNextItemCode(existingCodes);
-                        set("item_code", next ?? "");
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
-                    >
-                      {item.name}
-                    </button>
-                  ),
-                )}
+                {itemMatches.map((item: { id: number; name: string }) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      set("item_id", String(item.id));
+                      setItemSearch(item.name);
+                      setIsNewItem(false);
+                      setItemDropdownOpen(false);
+                      const existingCodes = rows
+                        .filter((r) => r.item_id === item.id)
+                        .map((r) => r.item_code);
+                      const next = generateNextItemCode(existingCodes);
+                      set("item_code", next ?? "");
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
+                  >
+                    {item.name}
+                  </button>
+                ))}
                 {itemSearch.trim() &&
                   !fixedItems.some(
                     (i: { name: string }) =>
@@ -1100,7 +1104,9 @@ export default function ItemAssetsPage() {
             label="Specifications"
             value={newItemForm.specifications}
             onChange={(e) => setNI("specifications", e.target.value)}
-            placeholder={"One spec per line, e.g.\n16GB RAM\nIntel Core i7\n512GB SSD"}
+            placeholder={
+              "One spec per line, e.g.\n16GB RAM\nIntel Core i7\n512GB SSD"
+            }
           />
         </div>
       )}
@@ -1269,7 +1275,8 @@ export default function ItemAssetsPage() {
         />
         {pendingFiles.length > 0 && (
           <p className="mt-1 text-xs text-gray-400">
-            {pendingFiles.length} file{pendingFiles.length > 1 ? "s" : ""} selected — will be uploaded on save
+            {pendingFiles.length} file{pendingFiles.length > 1 ? "s" : ""}{" "}
+            selected — will be uploaded on save
           </p>
         )}
       </div>
@@ -1293,6 +1300,12 @@ export default function ItemAssetsPage() {
                 Generate QR ({selectedIds.size})
               </Button>
             )}
+            <ExcelImportButton
+              onDownloadTemplate={() => api.downloadTemplate()}
+              onImport={(fd) => api.importExcel(fd)}
+              onSuccess={() => mutate(api.index())}
+              label="Import Excel"
+            />
             <Button onClick={openCreate}>
               <Plus className="h-4 w-4" />
               Add Asset
@@ -1447,7 +1460,7 @@ export default function ItemAssetsPage() {
       <DataTable
         columns={visibleColumns}
         data={paged}
-        loading={isLoading}
+        loading={isLoading || isValidating}
         keyExtractor={(r) => r.id}
       />
       <Pagination
@@ -1841,8 +1854,11 @@ export default function ItemAssetsPage() {
           <div className="space-y-2">
             {(docsListRow.documents ?? []).map((doc, idx) => {
               const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/storage/${doc.file_path}`;
-              const ext = doc.original_name.split(".").pop()?.toLowerCase() ?? "";
-              const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
+              const ext =
+                doc.original_name.split(".").pop()?.toLowerCase() ?? "";
+              const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(
+                ext,
+              );
               const isPdf = ext === "pdf";
               const icon = isPdf ? "📄" : isImage ? "🖼️" : "📎";
               return (
@@ -1851,8 +1867,13 @@ export default function ItemAssetsPage() {
                   className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5"
                 >
                   <span className="text-lg leading-none shrink-0">{icon}</span>
-                  <span className="flex-1 text-sm text-gray-700 truncate" title={doc.original_name}>
-                    <span className="text-xs text-gray-400 mr-1">#{idx + 1}</span>
+                  <span
+                    className="flex-1 text-sm text-gray-700 truncate"
+                    title={doc.original_name}
+                  >
+                    <span className="text-xs text-gray-400 mr-1">
+                      #{idx + 1}
+                    </span>
                     {doc.original_name}
                   </span>
                   <div className="flex items-center gap-1 shrink-0">

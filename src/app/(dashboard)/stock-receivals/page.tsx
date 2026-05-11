@@ -29,6 +29,7 @@ import {
 } from "@/lib/utils";
 import { fadeUp } from "@/lib/motion";
 import axiosInstance from "@/lib/axios";
+import ExcelImportButton from "@/components/shared/ExcelImportButton";
 
 interface ReceivalDocument {
   id: number;
@@ -423,10 +424,18 @@ export default function StockRecevalsPage() {
         title="Stock Receivals"
         subtitle="Record incoming consumable stock (automatically updates stock levels)"
         action={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            Record Receival
-          </Button>
+          <div className="flex items-center gap-2">
+            <ExcelImportButton
+              onDownloadTemplate={() => api.downloadTemplate()}
+              onImport={(fd) => api.importExcel(fd)}
+              onSuccess={() => mutate()}
+              label="Import Excel"
+            />
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" />
+              Record Receival
+            </Button>
+          </div>
         }
       />
       <FilterBar
