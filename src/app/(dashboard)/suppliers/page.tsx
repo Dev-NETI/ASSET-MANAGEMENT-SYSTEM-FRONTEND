@@ -17,6 +17,7 @@ import Textarea from '@/components/ui/Textarea';
 import { Plus, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
 import { truncate } from '@/lib/utils';
 import { fadeUp } from '@/lib/motion';
+import ExcelImportButton from '@/components/shared/ExcelImportButton';
 
 interface Supplier {
     id: number;
@@ -150,7 +151,17 @@ export default function SuppliersPage() {
     return (
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
             <PageHeader title="Suppliers" subtitle="Manage vendor/supplier records"
-                action={<Button onClick={openCreate}><Plus className="h-4 w-4" />Add Supplier</Button>} />
+                action={
+                    <div className="flex items-center gap-2">
+                        <ExcelImportButton
+                            onDownloadTemplate={() => api.downloadTemplate()}
+                            onImport={(fd) => api.importExcel(fd)}
+                            onSuccess={() => mutate()}
+                            label="Import Excel"
+                        />
+                        <Button onClick={openCreate}><Plus className="h-4 w-4" />Add Supplier</Button>
+                    </div>
+                } />
             <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name, contact, email, or phone…">
                 <div className="relative" ref={colsRef}>
                     <Button variant="secondary" onClick={() => setColsOpen(o => !o)}>

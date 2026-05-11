@@ -32,6 +32,14 @@ const useItemAssets = () => {
     const deleteDocument = (assetId: RouteParam, docId: RouteParam): Promise<AxiosResponse> =>
         axios.delete(`${route}/${assetId}/documents/${docId}`);
 
+    const downloadTemplate = (): Promise<AxiosResponse> =>
+        axios.get(`${route}/template`, { responseType: 'blob' });
+
+    const importExcel = (formData: FormData): Promise<AxiosResponse> =>
+        axios.post(`${route}/import`, formData, {
+            transformRequest: [(data: FormData) => data],
+        });
+
     return {
         ...useResource({ route }),
         assign,
@@ -39,6 +47,8 @@ const useItemAssets = () => {
         uploadDR,
         uploadDocument,
         deleteDocument,
+        downloadTemplate,
+        importExcel,
     };
 };
 

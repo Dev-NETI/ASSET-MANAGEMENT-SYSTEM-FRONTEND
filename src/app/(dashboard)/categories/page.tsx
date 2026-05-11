@@ -16,6 +16,7 @@ import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
 import { Plus, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
 import { fadeUp } from '@/lib/motion';
+import ExcelImportButton from '@/components/shared/ExcelImportButton';
 
 interface Category {
     id: number;
@@ -151,7 +152,17 @@ export default function CategoriesPage() {
     return (
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
             <PageHeader title="Categories" subtitle="Manage item categories"
-                action={<Button onClick={openCreate}><Plus className="h-4 w-4" />Add Category</Button>} />
+                action={
+                    <div className="flex items-center gap-2">
+                        <ExcelImportButton
+                            onDownloadTemplate={() => api.downloadTemplate()}
+                            onImport={(fd) => api.importExcel(fd)}
+                            onSuccess={() => mutate()}
+                            label="Import Excel"
+                        />
+                        <Button onClick={openCreate}><Plus className="h-4 w-4" />Add Category</Button>
+                    </div>
+                } />
             <FilterBar search={search} onSearchChange={handleSearch} placeholder="Search by name…">
                 <div className="relative" ref={colsRef}>
                     <Button variant="secondary" onClick={() => setColsOpen(o => !o)}>

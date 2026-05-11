@@ -14,7 +14,15 @@ const useStockReceivials = () => {
             transformRequest: [(data: FormData) => data],
         });
 
-    return { ...useResource({ route }), uploadDocument };
+    const downloadTemplate = (): Promise<AxiosResponse> =>
+        axios.get(`${route}/template`, { responseType: 'blob' });
+
+    const importExcel = (formData: FormData): Promise<AxiosResponse> =>
+        axios.post(`${route}/import`, formData, {
+            transformRequest: [(data: FormData) => data],
+        });
+
+    return { ...useResource({ route }), uploadDocument, downloadTemplate, importExcel };
 };
 
 export { useStockReceivials };
